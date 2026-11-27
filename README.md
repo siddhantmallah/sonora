@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/icon.png" width="128" alt="Sonora app icon"></p>
+
 # Sonora
 
 **A music player for Android that plays your own files and YouTube Music, with live visualizers, voice-driven lyrics, casting to any TV, and an audio stage built for people who care how music sounds.**
@@ -10,13 +12,16 @@ Kotlin · Jetpack Compose · Media3 (ExoPlayer). Android 8.0+, targets Android 1
 
 To install: open the APK on your phone and allow "Install unknown apps" for your browser or file manager when Android asks. Sonora isn't on the Play Store (see [YouTube Music](#youtube-music) below).
 
+After that, Sonora **updates itself**: it checks this page for new releases and installs them from inside the app (Settings → Updates).
+
 ## Screenshots
 
 <p>
-  <img src="docs/screenshots/home.jpg" width="24%" alt="Home with a live sky, weather and regional birds">
-  <img src="docs/screenshots/visualizer.jpg" width="24%" alt="Neon Orb visualizer reacting to the music">
-  <img src="docs/screenshots/lyrics.jpg" width="24%" alt="Synced lyrics, with the sung word lifted by the singer's voice">
-  <img src="docs/screenshots/enhance.jpg" width="24%" alt="Sonora Enhance and audiophile settings">
+  <img src="docs/screenshots/home.jpg" width="19%" alt="Home: live sky, weather and the liquid volt tab bar">
+  <img src="docs/screenshots/player.jpg" width="19%" alt="Now playing">
+  <img src="docs/screenshots/visualizer.jpg" width="19%" alt="Neon Orb visualizer reacting to the music">
+  <img src="docs/screenshots/lyrics.jpg" width="19%" alt="Synced lyrics, the sung word lifted by the singer's voice">
+  <img src="docs/screenshots/enhance.jpg" width="19%" alt="Sonora Enhance and audiophile settings">
 </p>
 <p>
   <img src="docs/screenshots/landscape-visualizer.jpg" width="49%" alt="Landscape player with the Wireframe visualizer across the page">
@@ -51,6 +56,12 @@ To install: open the APK on your phone and allow "Install unknown apps" for your
 - Time-synced lyrics from LRCLIB, embedded tags or `.lrc` files, with timing correction and manual matching
 - **Voice-driven words**: the word being sung swells, thickens and glows with the singer's actual voice; held notes stretch; whispers stay soft
 - Works in right-to-left scripts and in landscape
+
+**Look & feel**
+- Volt yellow accent with black on top; light, dark and pure-black themes
+- **Liquid tab bar**: the selected tab sits in a drop of liquid that stretches to the tab you pick, pinches off droplets, catches the light and ripples; drag along it to flick through pages
+- Clear glass dock and sheets, album-coloured player
+- Font choice: match your phone's font, or Inter, Manrope, Outfit, Nunito or a serif
 
 **Home**
 - A live sky for your time of day: real sun and moon positions, clouds and weather for where you are, golden hour and blue hour
