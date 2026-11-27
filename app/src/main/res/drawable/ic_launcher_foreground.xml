@@ -1,20 +1,93 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sound-wave "S" mark: three bars and a note head, centred in the 72dp safe zone. -->
+<!-- Sonora: a glossy black orb with a raised volt sound wave, lit from the top-left, casting a soft shadow. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="@color/launcher_foreground"
-        android:pathData="M36,46 a3,3 0 0 1 6,0 v16 a3,3 0 0 1 -6,0z" />
-    <path
-        android:fillColor="@color/launcher_foreground"
-        android:pathData="M46,36 a3,3 0 0 1 6,0 v36 a3,3 0 0 1 -6,0z" />
-    <path
-        android:fillColor="@color/launcher_accent"
-        android:pathData="M56,42 a3,3 0 0 1 6,0 v24 a3,3 0 0 1 -6,0z" />
-    <path
-        android:fillColor="@color/launcher_foreground"
-        android:pathData="M66,50 a3,3 0 0 1 6,0 v8 a3,3 0 0 1 -6,0z" />
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Shadow on the ground. -->
+    <path android:pathData="M30,82a24,5 0 1,0 48,0a24,5 0 1,0 -48,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="54" android:centerY="82" android:gradientRadius="24">
+                <item android:offset="0" android:color="#66000000" />
+                <item android:offset="1" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- The orb. -->
+    <path android:pathData="M27,52a27,27 0 1,0 54,0a27,27 0 1,0 -54,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="44" android:centerY="38" android:gradientRadius="40">
+                <item android:offset="0" android:color="#FF4A4A4A" />
+                <item android:offset="0.45" android:color="#FF181818" />
+                <item android:offset="1" android:color="#FF000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Volt light bouncing up onto its lower edge. -->
+    <path android:pathData="M27,52a27,27 0 1,0 54,0a27,27 0 1,0 -54,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="64" android:centerY="76" android:gradientRadius="26">
+                <item android:offset="0" android:color="#80EFFF1A" />
+                <item android:offset="1" android:color="#00EFFF1A" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Sound wave, raised (each bar shaded like a rounded bar of light). -->
+    <path android:pathData="M37.70,49.30a2.3,2.3 0 0 1 4.6,0V56.70a2.3,2.3 0 0 1 -4.6,0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="40" android:startY="47.0" android:endX="40" android:endY="59.0">
+                <item android:offset="0" android:color="#FFFCFF9E" />
+                <item android:offset="0.5" android:color="#FFEFFF1A" />
+                <item android:offset="1" android:color="#FFB5C000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M44.70,44.30a2.3,2.3 0 0 1 4.6,0V61.70a2.3,2.3 0 0 1 -4.6,0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="47" android:startY="42.0" android:endX="47" android:endY="64.0">
+                <item android:offset="0" android:color="#FFFCFF9E" />
+                <item android:offset="0.5" android:color="#FFEFFF1A" />
+                <item android:offset="1" android:color="#FFB5C000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M51.70,40.30a2.3,2.3 0 0 1 4.6,0V65.70a2.3,2.3 0 0 1 -4.6,0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="38.0" android:endX="54" android:endY="68.0">
+                <item android:offset="0" android:color="#FFFCFF9E" />
+                <item android:offset="0.5" android:color="#FFEFFF1A" />
+                <item android:offset="1" android:color="#FFB5C000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M58.70,44.30a2.3,2.3 0 0 1 4.6,0V61.70a2.3,2.3 0 0 1 -4.6,0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="61" android:startY="42.0" android:endX="61" android:endY="64.0">
+                <item android:offset="0" android:color="#FFFCFF9E" />
+                <item android:offset="0.5" android:color="#FFEFFF1A" />
+                <item android:offset="1" android:color="#FFB5C000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M65.70,49.30a2.3,2.3 0 0 1 4.6,0V56.70a2.3,2.3 0 0 1 -4.6,0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="68" android:startY="47.0" android:endX="68" android:endY="59.0">
+                <item android:offset="0" android:color="#FFFCFF9E" />
+                <item android:offset="0.5" android:color="#FFEFFF1A" />
+                <item android:offset="1" android:color="#FFB5C000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Specular highlight. -->
+    <group android:pivotX="44" android:pivotY="37" android:rotation="-28">
+        <path android:pathData="M33,37a11,6.5 0 1,0 22,0a11,6.5 0 1,0 -22,0">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="radial" android:centerX="44" android:centerY="37" android:gradientRadius="11">
+                    <item android:offset="0" android:color="#B3FFFFFF" />
+                    <item android:offset="1" android:color="#00FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+    <path android:fillColor="#73FFFFFF" android:pathData="M66.5,66.5m-1.6,0a1.6,1.6 0 1,0 3.2,0a1.6,1.6 0 1,0 -3.2,0" />
 </vector>

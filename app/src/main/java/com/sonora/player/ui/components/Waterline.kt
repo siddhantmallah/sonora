@@ -100,7 +100,13 @@ fun WaterlineTabs(
     var snap by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     fun nearest(x: Float) = ((x - padPx) / cell).toInt().coerceIn(0, tabs.lastIndex)
     val hover = dragX?.let { if (cell > 0f) nearest(it) else null }
-    LaunchedEffect(hover) { if (hover != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    // The page follows the finger: crossing onto a tab opens it right away (the drop stays under the finger).
+    LaunchedEffect(hover) {
+        if (hover != null) {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            if (hover != selected) onSelect(hover)
+        }
+    }
     LaunchedEffect(dragX) {
         val x = dragX ?: return@LaunchedEffect
         water.follow(x.coerceIn(centerOf(0), centerOf(tabs.lastIndex)))
@@ -118,6 +124,8 @@ fun WaterlineTabs(
 
     LaunchedEffect(selected, size, snap) {
         if (size.width <= 0f) return@LaunchedEffect
+        // While dragging, the finger leads; the drop settles on the tab when it lifts.
+        if (dragX != null) return@LaunchedEffect
         val r = min(with(density) { 22.dp.toPx() }, size.height / 2 - with(density) { 5.dp.toPx() })
         val q = max(0f, (cell - with(density) { 10.dp.toPx() }) / 2 - r)
         water.setTarget(centerOf(selected), size.height / 2, q, r, size.width)
@@ -145,8 +153,9 @@ fun WaterlineTabs(
                         dragX = null
                         if (x != null && cell > 0f) {
                             val i = nearest(x)
-                            if (i != selected) onSelect(i) else snap++
+                            if (i != selected) onSelect(i)
                         }
+                        snap++
                     },
                     onDragCancel = { dragX = null; snap++ },
                 )
