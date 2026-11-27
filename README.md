@@ -38,7 +38,8 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 - YouTube Music: search, browse, your feed, likes and playlists when signed in, radio-style autoplay, downloads
 - Gapless playback, sleep timer with fade-out, speed and pitch, skip silence
 - **Smart mix**: songs really overlap. A second deck locks onto the playing song within a few milliseconds and plays its outro while the next song starts, through the same EQ and effects. The new song rises as the old one falls away, the bass swaps halfway like a DJ, loud songs are levelled, dead air at the end is skipped and albums stay gapless
-- Background play, notification and lock-screen controls, Android Auto, Wear OS, home-screen widgets
+- Background play, notification and lock-screen controls, Android Auto, Wear OS
+- **Home-screen widgets** in the album's own colours: now playing, up next, like, and big controls
 
 **Cast to any TV**
 - **Google Cast**: Chromecast, Google TV / Android TV and Cast-enabled TVs
@@ -90,6 +91,7 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 - A live sky for your time of day: real sun and moon positions, clouds and weather for where you are, golden hour and blue hour
 - Flocks of real birds that change with your region, the season, the weather and the time of day
 - Daily mixes, Your Replay, recently played and recommendations
+- **Music for where you are**: at home, at the office (both set in Settings), at the beach, in the hills, at the gym, a café, the airport and more, Sonora suggests a mix that fits, tuned to your taste
 
 ## Build
 

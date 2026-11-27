@@ -15,8 +15,8 @@ android {
         applicationId = "com.sonora.player"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.5.0"
+        versionCode = 12
+        versionName = "1.5.1"
         // Service keys built into the app, read from secrets.properties (kept out of Git). Users never enter them.
         val secrets = Properties().apply {
             val f = rootProject.file("secrets.properties")

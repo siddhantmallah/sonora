@@ -166,7 +166,8 @@ half4 main(float2 fc) {
     float2 uv = fc / res;
     float h = 1.0 - uv.y;
     float day = smoothstep(-0.10, 0.12, sunAlt);
-    float low = (1.0 - smoothstep(0.0, 0.30, abs(sunAlt - 0.02))) * smoothstep(-0.22, -0.02, sunAlt);
+    // Golden hour / afterglow; gone ~40 min after sunset instead of lingering into the night.
+    float low = (1.0 - smoothstep(0.0, 0.30, abs(sunAlt - 0.02))) * smoothstep(-0.14, -0.02, sunAlt);
 
     // Three bands (horizon, middle, zenith) for each light: day, golden hour, blue hour and night. Real skies are
     // never a straight two-colour fade: the middle carries most of the hue, the horizon is pale (day), hot (dusk)
@@ -178,7 +179,8 @@ half4 main(float2 fc) {
     // Golden hour: indigo overhead, a dusty pink-violet middle, orange at the horizon.
     zen = mix(zen, float3(0.13, 0.15, 0.36), low * 0.65);
     mid = mix(mid, float3(0.55, 0.36, 0.58), low * 0.70);
-    hor = mix(hor, float3(1.00, 0.56, 0.26), low * 0.85);
+    // Orange while the sun is up; as the light goes it deepens to plum (a darkened orange reads as brown).
+    hor = mix(hor, mix(float3(0.36, 0.14, 0.30), float3(1.00, 0.56, 0.26), day), low * 0.85);
     // Blue hour: deep, saturated blue that settles into night.
     zen = mix(zen, float3(0.035, 0.06, 0.20), blue * 0.7);
     mid = mix(mid, float3(0.09, 0.15, 0.38), blue * 0.7);
@@ -385,6 +387,31 @@ private object SkyAssets {
     fun preload(context: android.content.Context) { runCatching { shader(context) } }
 }
 
+/** Height of the sky hero below the status bar. */
+val SKY_HERO_HEIGHT = 312.dp
+
+/** The colour the sky settles into at its bottom: the page carries it on from there. */
+fun skyFloor(now: Long, weather: Weather?): Color = skyWash(now, weather)
+
+/**
+ * The sky carried on below the hero: from its base colour down to the page, lightening over a long stretch (mixed in
+ * Oklab so it stays clean, never grey or brown), with the tiles floating on top. [top] is where the hero ends.
+ */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSkyCarry(top: Float, floor: Color, page: Color) {
+    val len = 560.dp.toPx()
+    if (top + len < 0f) return
+    fun mix(f: Float) = androidx.compose.ui.graphics.lerp(floor, page, f)
+    drawRect(
+        Brush.verticalGradient(
+            0.00f to floor, 0.10f to mix(0.22f), 0.22f to mix(0.48f), 0.36f to mix(0.72f),
+            0.52f to mix(0.88f), 0.72f to mix(0.97f), 1.00f to page,
+            startY = top, endY = top + len,
+        ),
+        topLeft = androidx.compose.ui.geometry.Offset(0f, top - 1f),
+        size = androidx.compose.ui.geometry.Size(size.width, len + 1f),
+    )
+}
+
 /** Builds the sky ahead of time (call from a background thread). */
 fun preloadSky(context: android.content.Context) { if (Build.VERSION.SDK_INT >= 33) SkyAssets.preload(context) }
 
@@ -478,7 +505,7 @@ fun SkyBanner(
     val pageColor = MaterialTheme.colorScheme.background
 
     Box(
-        modifier.fillMaxWidth().height(topInset + 296.dp)
+        modifier.fillMaxWidth().height(topInset + SKY_HERO_HEIGHT)
             .drawWithContent {
                 drawContent()
                 if (Build.VERSION.SDK_INT < 33) return@drawWithContent
@@ -540,13 +567,19 @@ fun SkyBanner(
         // The sky only changes ~60 times a second; asking for 60 Hz here (scrolling still asks for more) gives
         // each frame the full 16 ms instead of racing a 120 Hz deadline it doesn't need.
         SkyLife(weather, dayPart, skyTime, now, Modifier.fillMaxSize().preferredFrameRate(60f))
-        // The sky melts into the page instead of ending at a card edge.
+        // The sky doesn't end here: its last stretch settles into its own base colour, which the page then carries on
+        // down behind the tiles (see skyFloor + HomeScreen), lightening slowly. No edge, no fog band.
+        val floor = remember(now / 60_000, weather) { skyFloor(now, weather) }
         Box(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(80.dp)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, pageColor.copy(alpha = 0.55f), pageColor))),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(120.dp).background(
+                Brush.verticalGradient(
+                    0f to floor.copy(alpha = 0f), 0.3f to floor.copy(alpha = 0.25f), 0.6f to floor.copy(alpha = 0.65f),
+                    0.85f to floor.copy(alpha = 0.92f), 1f to floor,
+                ),
+            ),
         )
 
-        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 16.dp, top = topInset + 14.dp, bottom = 52.dp)) {
+        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 16.dp, top = topInset + 14.dp, bottom = 56.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

@@ -229,6 +229,34 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
                 "Always-On: a dim clock, the song and its lyrics on black, drifting so nothing burns in. Pick Sonora as the " +
                 "screen saver and it shows by itself while your phone charges.",
         ) {
+            row { IosToggleRow("Music for where you are", L.drawable.lucide_ic_navigation, IosColors.Teal, s.placeMixes, subtitle = "Home, office, beach, gym, café… a mix that suits it") { set.set(Keys.placeMixes, it) } }
+            if (s.placeMixes) {
+                listOf(Triple("home", "Home", s.homePlace), Triple("office", "Office", s.officePlace)).forEach { (key, label, value) ->
+                    row {
+                        val placeScope = androidx.compose.runtime.rememberCoroutineScope()
+                        IosRow(
+                            label, if (key == "home") L.drawable.lucide_ic_house else L.drawable.lucide_ic_settings,
+                            if (key == "home") IosColors.Green else IosColors.Blue,
+                            subtitle = if (value.isBlank()) "Tap while you're there to save it" else "Saved · tap here to move it to where you are",
+                            chevron = false,
+                            trailing = if (value.isBlank()) null else ({
+                                Text(
+                                    "Clear", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.clickable { set.set(if (key == "home") Keys.homePlace else Keys.officePlace, "") }.padding(8.dp),
+                                )
+                            }),
+                        ) {
+                            placeScope.launch {
+                                val ok = com.sonora.player.data.PlaceSense.saveHere(context, set, key)
+                                android.widget.Toast.makeText(
+                                    context, if (ok) "$label saved" else "Couldn't get your location. Allow location for Sonora and try again.",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                    }
+                }
+            }
             row { IosToggleRow("Lyrics on the now-playing pill", L.drawable.lucide_ic_mic_vocal, IosColors.Pink, s.cardLyrics, subtitle = "The sung line under the title") { set.set(Keys.cardLyrics, it) } }
             row { IosRow("Always-On screen", L.drawable.lucide_ic_clock, IosColors.Purple, subtitle = "Open it now") { com.sonora.player.ui.aod.AlwaysOnActivity.open(context) } }
             row {
@@ -248,7 +276,7 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
 
         IosGroup(
             "Sonora Enhance", largeTitle = true,
-            footer = if (s.bitPerfectUsb) "Off while Bit-perfect USB DAC is on: nothing touches the samples."
+            footer = if (s.bitPerfectUsb) "Turns itself off while a USB DAC plays bit-perfect: nothing touches the samples. On Bluetooth and speakers it works as normal."
             else "Lossy audio (streams, MP3, AAC, Opus) loses its top end and some sparkle. Enhance regenerates the highs " +
                 "the codec cut off, adds a touch of warmth and width, and stops anything from clipping. It can't turn a " +
                 "128 kbps stream into true 320 kbps (that detail is gone), but it brings back much of the feel. Auto " +

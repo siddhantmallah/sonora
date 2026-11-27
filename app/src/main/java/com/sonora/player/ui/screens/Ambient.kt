@@ -59,9 +59,10 @@ fun skyWash(now: Long, weather: Weather?): Color {
     val set = weather?.sunset ?: todayAt(18, 15)
     val (_, alt) = sunAltitude(now, rise, set)
     val day = ((alt + 0.10f) / 0.22f).coerceIn(0f, 1f)
-    val low = (1f - (kotlin.math.abs(alt - 0.02f) / 0.30f)).coerceIn(0f, 1f) * ((alt + 0.22f) / 0.20f).coerceIn(0f, 1f)
+    val low = (1f - (kotlin.math.abs(alt - 0.02f) / 0.30f)).coerceIn(0f, 1f) * ((alt + 0.14f) / 0.12f).coerceIn(0f, 1f)
     var c = lerp(Color(0xFF26315E), Color(0xFF8CC4F2), day)
-    c = lerp(c, Color(0xFFF4A36E), low * 0.75f)
+    // Peach at sunset, deepening to plum as it gets dark (never brown), same as the sky.
+    c = lerp(c, lerp(Color(0xFF5A3460), Color(0xFFF4A36E), day), low * 0.75f)
     val grey = when (weather?.kind) {
         Sky.CLOUDY, Sky.FOG -> 0.45f
         Sky.RAIN, Sky.DRIZZLE, Sky.SNOW -> 0.55f

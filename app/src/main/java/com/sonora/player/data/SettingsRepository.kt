@@ -82,6 +82,11 @@ data class AppSettings(
     val trafficOn: Boolean = true,
     /** Open Driving mode by itself when music plays and you move faster than 20 km/h. */
     val autoDrive: Boolean = true,
+    /** Music for where you are (home, office, beach, gym…). */
+    val placeMixes: Boolean = true,
+    /** Your home and office as "lat,lon" (on the phone only), or empty. */
+    val homePlace: String = "",
+    val officePlace: String = "",
 )
 
 /** Folders that hold voice notes and call recordings rather than music. Matched as path fragments. */
@@ -128,6 +133,9 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
         val tomtomKey = stringPreferencesKey("tomtom_key")
         val trafficOn = booleanPreferencesKey("traffic_on")
         val autoDrive = booleanPreferencesKey("auto_drive")
+        val placeMixes = booleanPreferencesKey("place_mixes")
+        val homePlace = stringPreferencesKey("home_place")
+        val officePlace = stringPreferencesKey("office_place")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -170,6 +178,9 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
             tomtomKey = p[Keys.tomtomKey] ?: d.tomtomKey,
             trafficOn = p[Keys.trafficOn] ?: d.trafficOn,
             autoDrive = p[Keys.autoDrive] ?: d.autoDrive,
+            placeMixes = p[Keys.placeMixes] ?: d.placeMixes,
+            homePlace = p[Keys.homePlace] ?: d.homePlace,
+            officePlace = p[Keys.officePlace] ?: d.officePlace,
         )
     }
 

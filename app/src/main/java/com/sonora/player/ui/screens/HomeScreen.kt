@@ -1,5 +1,7 @@
 package com.sonora.player.ui.screens
 
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
@@ -126,7 +128,38 @@ fun HomeScreen(vm: MainViewModel, actions: UiActions) {
         onRefresh = { vm.loadFeed(force = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = com.sonora.player.ui.components.bottomBarSpace())) {
+        // The sky carries on behind the first rows (under the tiles), following the scroll, so it never just stops.
+        val skyNow by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
+            while (true) { kotlinx.coroutines.delay(60_000); value = System.currentTimeMillis() }
+        }
+        val floor = remember(skyNow / 60_000, weather) { skyFloor(skyNow, weather) }
+        val page = MaterialTheme.colorScheme.background
+        // Where you are, as a mood (refreshed every few minutes; nothing without location or with it turned off).
+        val placeSettings by vm.settings.collectAsStateWithLifecycle()
+        val place by androidx.compose.runtime.produceState<com.sonora.player.data.PlaceMood?>(
+            null, placeSettings.placeMixes, placeSettings.homePlace, placeSettings.officePlace,
+        ) {
+            while (true) {
+                value = runCatching { com.sonora.player.data.PlaceSense.detect(context, vm.c.http, vm.c.settings.state.value) }.getOrNull()
+                kotlinx.coroutines.delay(5 * 60_000)
+            }
+        }
+        val tilesHeight = remember { intArrayOf(0) }
+        LazyColumn(
+            Modifier.fillMaxSize().drawBehind {
+                val first = list.layoutInfo.visibleItemsInfo.firstOrNull() ?: return@drawBehind
+                // Where the hero ends, from whichever of the first rows is on screen.
+                val items = list.layoutInfo.visibleItemsInfo
+                items.firstOrNull { it.index == 1 }?.let { tilesHeight[0] = it.size }
+                val heroEnd = items.firstOrNull { it.index == 0 }?.let { it.offset + it.size }
+                    ?: items.firstOrNull { it.index == 1 }?.offset
+                    ?: items.firstOrNull { it.index == 2 }?.takeIf { tilesHeight[0] > 0 }?.let { it.offset - tilesHeight[0] }
+                    ?: return@drawBehind
+                if (first.index > 2) return@drawBehind
+                drawSkyCarry(heroEnd.toFloat(), floor, page)
+            },
+            state = list, contentPadding = PaddingValues(bottom = com.sonora.player.ui.components.bottomBarSpace()),
+        ) {
             // ---- Sky hero: greeting, time, weather, air quality and Sky Mix; the sky follows the real sun.
             item(key = "sky") {
                 SkyBanner(
@@ -140,6 +173,13 @@ fun HomeScreen(vm: MainViewModel, actions: UiActions) {
                     // Drawn above the rows below it, so its sunlight can spill over them.
                     modifier = Modifier.zIndex(1f),
                 )
+            }
+
+            // ---- Music for where you are: home, office, the beach, the gym…
+            place?.let { p ->
+                item(key = "place") {
+                    PlaceCard(p, firstName) { vm.playSkyMix(p.mix, p.query) }
+                }
             }
 
             // ---- Quick access (Spotify-style grid), right under the sky
@@ -597,5 +637,38 @@ private fun FitTripCard(vm: MainViewModel) {
                 )
             }
         }
+    }
+}
+
+
+/** "You're at the beach, Sid": a mix for the place you're at, one tap to play. */
+@Composable
+private fun PlaceCard(p: com.sonora.player.data.PlaceMood, firstName: String?, onPlay: () -> Unit) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+            .clip(shape).background(MaterialTheme.colorScheme.surface).clickable(onClick = onPlay)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) { Text(p.kind.emoji, fontSize = androidx.compose.ui.unit.TextUnit(24f, androidx.compose.ui.unit.TextUnitType.Sp)) }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                p.where + (firstName?.let { ", $it" } ?: ""), style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                p.mix + (p.name?.let { " · $it" } ?: ""), style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(
+            Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) { LIcon(L.drawable.lucide_ic_play, "Play ${p.mix}", tint = MaterialTheme.colorScheme.onPrimaryContainer, size = 20.dp) }
     }
 }

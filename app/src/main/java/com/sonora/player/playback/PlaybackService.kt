@@ -193,6 +193,11 @@ class PlaybackService : MediaLibraryService() {
                 if (reason == Player.DISCONTINUITY_REASON_SEEK) mixer.onUserSeek()
             }
 
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                // The queue changed: the widget's "Up next" follows.
+                pushWidget()
+            }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 pushWidget()
                 if (!isPlaying) saveQueue()
@@ -606,6 +611,7 @@ class PlaybackService : MediaLibraryService() {
         currentFavorite = fav
         session.setMediaButtonPreferences(buttons(fav))
         publishExtras()
+        pushWidget()
     }
 
     private fun buttons(favorite: Boolean): List<CommandButton> = listOf(
@@ -624,6 +630,10 @@ class PlaybackService : MediaLibraryService() {
             artist = md.artist?.toString(),
             artUri = md.artworkUri,
             isPlaying = player.isPlaying,
+            upNext = player.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { i ->
+                player.getMediaItemAt(i).mediaMetadata.let { n -> listOfNotNull(n.title?.toString(), n.artist?.toString()).joinToString(" · ") }
+            },
+            liked = currentFavorite,
         )
     }
 
