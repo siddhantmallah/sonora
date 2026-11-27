@@ -621,6 +621,9 @@ class PlaybackService : MediaLibraryService() {
             .build(),
     )
 
+    private fun describe(index: Int): String =
+        player.getMediaItemAt(index).mediaMetadata.let { n -> listOfNotNull(n.title?.toString(), n.artist?.toString()).joinToString(" · ") }
+
     private fun pushWidget() {
         val item = player.currentMediaItem
         val md = item?.mediaMetadata ?: MediaMetadata.EMPTY
@@ -630,9 +633,11 @@ class PlaybackService : MediaLibraryService() {
             artist = md.artist?.toString(),
             artUri = md.artworkUri,
             isPlaying = player.isPlaying,
-            upNext = player.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { i ->
-                player.getMediaItemAt(i).mediaMetadata.let { n -> listOfNotNull(n.title?.toString(), n.artist?.toString()).joinToString(" · ") }
-            },
+            upNext = player.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let { describe(it) },
+            later = player.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }
+                ?.let { player.currentTimeline.getNextWindowIndex(it, Player.REPEAT_MODE_OFF, player.shuffleModeEnabled) }
+                ?.takeIf { it != C.INDEX_UNSET && it != player.currentMediaItemIndex }?.let { describe(it) },
+            album = md.albumTitle?.toString()?.takeIf { it.isNotBlank() },
             liked = currentFavorite,
         )
     }

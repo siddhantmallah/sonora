@@ -79,6 +79,9 @@ data class WidgetData(
     val art: Bitmap? = null,
     val isPlaying: Boolean = false,
     val upNext: String? = null,
+    /** The song after next, for the big widget. */
+    val later: String? = null,
+    val album: String? = null,
     val liked: Boolean = false,
     /** A soft gradient in the album's own colours, behind everything. */
     val backdrop: Bitmap? = null,
@@ -94,7 +97,7 @@ object WidgetBridge {
 
     fun push(
         context: Context, title: String?, artist: String?, artUri: Uri?, isPlaying: Boolean,
-        upNext: String? = null, liked: Boolean = false,
+        upNext: String? = null, liked: Boolean = false, later: String? = null, album: String? = null,
     ) {
         val app = context.applicationContext
         scope.launch {
@@ -102,7 +105,7 @@ object WidgetBridge {
             val same = artUri == prev.artUri && prev.art != null
             val art = if (same) prev.art else crisp(Artwork.load(app, artUri, ART_PX))
             val (backdrop, accent) = if (same) prev.backdrop to prev.accent else colours(art)
-            val next = WidgetData(title, artist, artUri, art, isPlaying, upNext, liked, backdrop, accent)
+            val next = WidgetData(title, artist, artUri, art, isPlaying, upNext, later, album, liked, backdrop, accent)
             if (next == prev) return@launch
             _state.value = next
             app.getSharedPreferences("widget", Context.MODE_PRIVATE).edit()
@@ -120,7 +123,10 @@ object WidgetBridge {
         val uri = p.getString("art", null)?.let(Uri::parse)
         val art = withContext(Dispatchers.IO) { crisp(Artwork.load(context, uri, ART_PX)) }
         val (backdrop, accent) = colours(art)
-        _state.value = WidgetData(p.getString("title", null), p.getString("artist", null), uri, art, false, p.getString("next", null), false, backdrop, accent)
+        _state.value = WidgetData(
+            p.getString("title", null), p.getString("artist", null), uri, art, false, p.getString("next", null),
+            backdrop = backdrop, accent = accent,
+        )
     }
 
     /** Connects a short-lived controller to the service and runs [block] on it. */
@@ -193,14 +199,12 @@ class LikeAction : ActionCallback {
         WidgetBridge.control(context) { it.sendCustomCommand(SessionCommand(Commands.TOGGLE_FAVORITE, Bundle.EMPTY), Bundle.EMPTY) }
 }
 
-private val SMALL = DpSize(110.dp, 50.dp)
-private val WIDE = DpSize(250.dp, 50.dp)
-private val SQUARE = DpSize(140.dp, 140.dp)
-private val LARGE = DpSize(250.dp, 180.dp)
-
-/** Resizable player: compact pill, wide bar with controls, or a large card with the artwork, up next and a like. */
+/**
+ * The player widget, drawn for the exact size it has on your home screen: the more room, the more it shows (bigger
+ * artwork, the album, the next two songs, bigger buttons); small sizes keep just what fits.
+ */
 class PlayerWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, SQUARE, LARGE))
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         WidgetBridge.ensureRestored(context)
@@ -208,11 +212,10 @@ class PlayerWidget : GlanceAppWidget() {
             val data by WidgetBridge.state.collectAsState()
             val size = LocalSize.current
             when {
-                size.height >= LARGE.height && size.width >= LARGE.width -> LargeLayout(data)
-                // Narrow but tall (2x2, 3x2, 3x3): a stacked card instead of a stretched bar.
-                size.height >= SQUARE.height && size.width >= SQUARE.width -> SquareLayout(data)
-                size.width >= WIDE.width -> WideLayout(data)
-                else -> SmallLayout(data)
+                size.height < 92.dp -> if (size.width < 200.dp) SmallLayout(data) else WideLayout(data, size)
+                size.width < 230.dp -> TallLayout(data, size)
+                size.height < 200.dp -> MediumLayout(data, size)
+                else -> LargeLayout(data, size)
             }
         }
     }
@@ -265,32 +268,7 @@ private fun Backdrop(data: WidgetData) {
     else Box(GlanceModifier.fillMaxSize().background(ColorProvider(Color(0xFF1C2033)))) {}
 }
 
-/** 2x2 / 3x2 / 3x3: artwork on top, the song, and the three controls. */
-@Composable
-private fun SquareLayout(data: WidgetData) {
-    Box(GlanceModifier.fillMaxSize().cornerRadius(26.dp)) {
-        Backdrop(data)
-        Column(GlanceModifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                ArtImage(data, GlanceModifier.size(64.dp).cornerRadius(16.dp).clickable(actionStartActivity<MainActivity>()))
-                Spacer(GlanceModifier.width(10.dp))
-                Column(GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
-                    Text(data.title ?: "Sonora", maxLines = 2, style = TextStyle(color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold))
-                    Text(data.artist ?: "Tap play", maxLines = 1, style = TextStyle(color = Soft, fontSize = 12.sp))
-                }
-            }
-            Spacer(GlanceModifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconAction(L.drawable.lucide_ic_skip_back, "Previous", 38, actionRunCallback<PreviousAction>())
-                Spacer(GlanceModifier.width(8.dp))
-                PlayButton(data, 46)
-                Spacer(GlanceModifier.width(8.dp))
-                IconAction(L.drawable.lucide_ic_skip_forward, "Next", 38, actionRunCallback<NextAction>())
-            }
-        }
-    }
-}
-
+/** One-row sizes: artwork and play. */
 @Composable
 private fun SmallLayout(data: WidgetData) {
     Box(GlanceModifier.fillMaxSize().cornerRadius(24.dp)) {
@@ -303,69 +281,148 @@ private fun SmallLayout(data: WidgetData) {
     }
 }
 
+/** Wide and short (4x1, 5x1): a bar with the song and the three controls. */
 @Composable
-private fun WideLayout(data: WidgetData) {
+private fun WideLayout(data: WidgetData, size: DpSize) {
+    val art = (size.height - 20.dp).coerceIn(40.dp, 64.dp)
     Box(GlanceModifier.fillMaxSize().cornerRadius(26.dp)) {
         Backdrop(data)
         Row(GlanceModifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            ArtImage(data, GlanceModifier.size(58.dp).cornerRadius(15.dp).clickable(actionStartActivity<MainActivity>()))
+            ArtImage(data, GlanceModifier.size(art).cornerRadius(15.dp).clickable(actionStartActivity<MainActivity>()))
             Spacer(GlanceModifier.width(12.dp))
             Column(GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
                 Text(data.title ?: "Sonora", maxLines = 1, style = TextStyle(color = White, fontSize = 15.sp, fontWeight = FontWeight.Bold))
                 Text(subtitle(data), maxLines = 1, style = TextStyle(color = Soft, fontSize = 12.sp))
             }
-            IconAction(L.drawable.lucide_ic_skip_back, "Previous", 34, actionRunCallback<PreviousAction>())
-            PlayButton(data, 40)
-            IconAction(L.drawable.lucide_ic_skip_forward, "Next", 34, actionRunCallback<NextAction>())
+            if (size.width >= 290.dp) IconAction(L.drawable.lucide_ic_skip_back, "Previous", 36, actionRunCallback<PreviousAction>())
+            PlayButton(data, 42)
+            IconAction(L.drawable.lucide_ic_skip_forward, "Next", 36, actionRunCallback<NextAction>())
+        }
+    }
+}
+
+/** Narrow and tall (2x2, 2x3): artwork on top, the song, the controls. */
+@Composable
+private fun TallLayout(data: WidgetData, size: DpSize) {
+    val art = minOf(size.width - 28.dp, size.height - 130.dp).coerceIn(44.dp, 170.dp)
+    Box(GlanceModifier.fillMaxSize().cornerRadius(26.dp)) {
+        Backdrop(data)
+        Column(GlanceModifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(GlanceModifier.fillMaxWidth().defaultWeight(), contentAlignment = Alignment.Center) {
+                ArtImage(data, GlanceModifier.size(art).cornerRadius(18.dp).clickable(actionStartActivity<MainActivity>()))
+            }
+            Spacer(GlanceModifier.height(8.dp))
+            Text(data.title ?: "Sonora", maxLines = 1, style = TextStyle(color = White, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+            Text(data.artist ?: "Tap play", maxLines = 1, style = TextStyle(color = Soft, fontSize = 12.sp))
+            Spacer(GlanceModifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconAction(L.drawable.lucide_ic_skip_back, "Previous", 36, actionRunCallback<PreviousAction>())
+                Spacer(GlanceModifier.width(6.dp))
+                PlayButton(data, 44)
+                Spacer(GlanceModifier.width(6.dp))
+                IconAction(L.drawable.lucide_ic_skip_forward, "Next", 36, actionRunCallback<NextAction>())
+            }
+        }
+    }
+}
+
+/** Medium (3x2, 4x2, 5x2): artwork beside the song and what's next, controls along the bottom. */
+@Composable
+private fun MediumLayout(data: WidgetData, size: DpSize) {
+    val art = (size.height - 86.dp).coerceIn(52.dp, 110.dp)
+    Box(GlanceModifier.fillMaxSize().cornerRadius(26.dp)) {
+        Backdrop(data)
+        Column(GlanceModifier.fillMaxSize().padding(12.dp)) {
+            Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
+                ArtImage(data, GlanceModifier.size(art).cornerRadius(18.dp).clickable(actionStartActivity<MainActivity>()))
+                Spacer(GlanceModifier.width(12.dp))
+                Column(GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
+                    Text(data.title ?: "Sonora", maxLines = 2, style = TextStyle(color = White, fontSize = 16.sp, fontWeight = FontWeight.Bold))
+                    Text(data.artist ?: "Tap play for your music", maxLines = 1, style = TextStyle(color = Soft, fontSize = 13.sp))
+                    if (size.width >= 280.dp && art >= 80.dp) data.upNext?.let {
+                        Spacer(GlanceModifier.height(6.dp))
+                        Text("Up next · $it", maxLines = 1, style = TextStyle(color = Faint, fontSize = 12.sp))
+                    }
+                }
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+                if (data.title != null) IconAction(L.drawable.lucide_ic_heart, if (data.liked) "Unlike" else "Like", 38, actionRunCallback<LikeAction>(), tint = if (data.liked) Color(0xFFFF2D55) else Color(0xB3FFFFFF))
+                Spacer(GlanceModifier.width(10.dp))
+                IconAction(L.drawable.lucide_ic_skip_back, "Previous", 42, actionRunCallback<PreviousAction>())
+                Spacer(GlanceModifier.width(10.dp))
+                PlayButton(data, 50)
+                Spacer(GlanceModifier.width(10.dp))
+                IconAction(L.drawable.lucide_ic_skip_forward, "Next", 42, actionRunCallback<NextAction>())
+                Spacer(GlanceModifier.width(48.dp))
+            }
+        }
+    }
+}
+
+/** Large (4x3 and up): big artwork, the album, the next two songs, big controls. Everything scales with the size. */
+@Composable
+private fun LargeLayout(data: WidgetData, size: DpSize) {
+    val roomy = size.height >= 320.dp
+    val art = minOf(size.width * 0.40f, size.height * (if (roomy) 0.42f else 0.36f)).coerceIn(72.dp, 170.dp)
+    val play = (size.height * 0.17f).coerceIn(50.dp, 68.dp)
+    Box(GlanceModifier.fillMaxSize().cornerRadius(30.dp)) {
+        Backdrop(data)
+        Column(GlanceModifier.fillMaxSize().padding(16.dp)) {
+            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (data.isPlaying) "NOW PLAYING" else if (data.title != null) "PAUSED" else "SONORA",
+                    modifier = GlanceModifier.defaultWeight(),
+                    style = TextStyle(color = ColorProvider(Color(data.accent)), fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                )
+                if (data.title != null) IconAction(
+                    L.drawable.lucide_ic_heart, if (data.liked) "Unlike" else "Like", 34, actionRunCallback<LikeAction>(),
+                    tint = if (data.liked) Color(0xFFFF2D55) else Color(0xB3FFFFFF),
+                )
+            }
+            Spacer(GlanceModifier.height(8.dp))
+            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                ArtImage(data, GlanceModifier.size(art).cornerRadius(22.dp).clickable(actionStartActivity<MainActivity>()))
+                Spacer(GlanceModifier.width(16.dp))
+                Column(GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
+                    Text(data.title ?: "Nothing playing", maxLines = if (roomy) 3 else 2, style = TextStyle(color = White, fontSize = if (roomy) 22.sp else 19.sp, fontWeight = FontWeight.Bold))
+                    Spacer(GlanceModifier.height(3.dp))
+                    Text(data.artist ?: "Tap play for your music", maxLines = 1, style = TextStyle(color = Soft, fontSize = 15.sp))
+                    data.album?.takeIf { roomy && it != data.title }?.let {
+                        Spacer(GlanceModifier.height(2.dp))
+                        Text(it, maxLines = 1, style = TextStyle(color = Faint, fontSize = 13.sp))
+                    }
+                }
+            }
+            // What's coming: one song on medium-large, two when there's room.
+            Column(GlanceModifier.fillMaxWidth().defaultWeight().padding(top = 12.dp)) {
+                if (data.upNext != null) {
+                    Text("UP NEXT", style = TextStyle(color = Faint, fontSize = 11.sp, fontWeight = FontWeight.Bold))
+                    Spacer(GlanceModifier.height(4.dp))
+                    NextRow(data.upNext)
+                    if (roomy) data.later?.let { Spacer(GlanceModifier.height(4.dp)); NextRow(it) }
+                }
+            }
+            Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+                IconAction(L.drawable.lucide_ic_skip_back, "Previous", 50, actionRunCallback<PreviousAction>())
+                Spacer(GlanceModifier.width(22.dp))
+                PlayButton(data, play.value.toInt())
+                Spacer(GlanceModifier.width(22.dp))
+                IconAction(L.drawable.lucide_ic_skip_forward, "Next", 50, actionRunCallback<NextAction>())
+            }
         }
     }
 }
 
 @Composable
-private fun LargeLayout(data: WidgetData) {
-    // Fit the height it's given: room for "Up next" and big artwork only when the widget is tall enough.
-    val h = LocalSize.current.height
-    val roomy = h >= 240.dp
-    val art = if (roomy) 112.dp else if (h >= 205.dp) 88.dp else 68.dp
-    Box(GlanceModifier.fillMaxSize().cornerRadius(28.dp)) {
-        Backdrop(data)
-        Column(GlanceModifier.fillMaxSize().padding(16.dp)) {
-            // Header: what this is, and the like.
-            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (data.isPlaying) "NOW PLAYING" else if (data.title != null) "PAUSED" else "SONORA",
-                    modifier = GlanceModifier.defaultWeight(),
-                    style = TextStyle(color = ColorProvider(Color(data.accent)), fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                )
-                if (data.title != null) IconAction(
-                    L.drawable.lucide_ic_heart, if (data.liked) "Unlike" else "Like", 30,
-                    actionRunCallback<LikeAction>(), tint = if (data.liked) Color(0xFFFF2D55) else Color(0xB3FFFFFF),
-                )
-            }
-            Spacer(GlanceModifier.height(6.dp))
-            Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                ArtImage(data, GlanceModifier.size(art).cornerRadius(20.dp).clickable(actionStartActivity<MainActivity>()))
-                Spacer(GlanceModifier.width(16.dp))
-                Column(GlanceModifier.defaultWeight().fillMaxHeight().clickable(actionStartActivity<MainActivity>()), verticalAlignment = Alignment.CenterVertically) {
-                    Text(data.title ?: "Nothing playing", maxLines = 2, style = TextStyle(color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold))
-                    Spacer(GlanceModifier.height(2.dp))
-                    Text(data.artist ?: "Tap play for your music", maxLines = 1, style = TextStyle(color = Soft, fontSize = 14.sp))
-                    data.upNext?.takeIf { roomy }?.let {
-                        Spacer(GlanceModifier.height(10.dp))
-                        Text("Up next", style = TextStyle(color = Faint, fontSize = 11.sp, fontWeight = FontWeight.Medium))
-                        Text(it, maxLines = 1, style = TextStyle(color = Soft, fontSize = 13.sp))
-                    }
-                }
-            }
-            Spacer(GlanceModifier.height(10.dp))
-            Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
-                IconAction(L.drawable.lucide_ic_skip_back, "Previous", 48, actionRunCallback<PreviousAction>())
-                Spacer(GlanceModifier.width(18.dp))
-                PlayButton(data, 58)
-                Spacer(GlanceModifier.width(18.dp))
-                IconAction(L.drawable.lucide_ic_skip_forward, "Next", 48, actionRunCallback<NextAction>())
-            }
-        }
+private fun NextRow(text: String) {
+    Row(
+        GlanceModifier.fillMaxWidth().cornerRadius(12.dp).background(ColorProvider(Color(0x1FFFFFFF))).padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(ImageProvider(L.drawable.lucide_ic_music), null, GlanceModifier.size(14.dp), colorFilter = ColorFilter.tint(Faint))
+        Spacer(GlanceModifier.width(8.dp))
+        Text(text, maxLines = 1, style = TextStyle(color = Soft, fontSize = 13.sp))
     }
 }
 
