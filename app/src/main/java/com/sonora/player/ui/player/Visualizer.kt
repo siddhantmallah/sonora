@@ -68,7 +68,7 @@ class VizEngine(private val n: Int = 64) {
     private var lastNanos = 0L
 
     // Terrain: recent spectra, newest first.
-    val rows = 34
+    val rows = 30
     val cols = 40
     val history = Array(rows) { FloatArray(cols) }
     private var rowClock = 0f
@@ -96,8 +96,8 @@ class VizEngine(private val n: Int = 64) {
     var edges = true
 
     // Neon Orb: eased values for each blob point, ray and ribbon point, so shapes swell and settle instead of twitching.
-    val orbV = Array(5) { FloatArray(72) }
-    val rayV = FloatArray(140)
+    val orbV = Array(5) { FloatArray(48) }
+    val rayV = FloatArray(100)
     val ribV = Array(2) { FloatArray(29) }
     var orbCore = 0f
     var orbLongest = 0f
@@ -255,7 +255,7 @@ private fun closedCurve(path: Path, c: Offset, rs: FloatArray, rot: Float) {
 /** Soft ceiling: grows like [x] when small, never past [room]. Keeps loud passages inside the canvas. */
 private fun fit(x: Float, room: Float): Float = if (room <= 0f) 0f else room * (1f - exp(-x.coerceAtLeast(0f) / room))
 
-private val orbRs = FloatArray(72)
+private val orbRs = FloatArray(48)
 private val orbBlobs = arrayOf(floatArrayOf(0f, 0f, 14f), floatArrayOf(0.92f, 10f, 30f), floatArrayOf(0.62f, 22f, 44f), floatArrayOf(0.07f, 34f, 60f), floatArrayOf(0.5f, 4f, 24f))
 
 private fun DrawScope.drawOrb(e: VizEngine, paths: Array<Path>, tint: Color) {
@@ -303,7 +303,7 @@ private fun DrawScope.drawOrb(e: VizEngine, paths: Array<Path>, tint: Color) {
     // Light rays: long thin lines whose length follows each band, drawn in one pass with a fading gradient.
     val rayPath = paths[10]
     rayPath.reset()
-    val rays = 140
+    val rays = 100
     var longest = core
     for (i in 0 until rays) {
         val f = i.toFloat() / rays
@@ -322,7 +322,7 @@ private fun DrawScope.drawOrb(e: VizEngine, paths: Array<Path>, tint: Color) {
     drawPath(
         rayPath,
         Brush.radialGradient(0f to Color.White.copy(alpha = 0.6f), (core / fade) to Color.White.copy(alpha = 0.5f), 1f to neon(0.62f).copy(alpha = 0f), center = c, radius = fade),
-        style = Stroke(0.9f * density), blendMode = BlendMode.Plus,
+        style = Stroke(1.1f * density), blendMode = BlendMode.Plus,
     )
 
     // Flowing loop lines that breathe with the mids and highs.
