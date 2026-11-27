@@ -91,6 +91,51 @@ private val LightScheme = lightColorScheme(
     outlineVariant = Brand.LightSeparator,
 )
 
+/** The fonts you can pick in Settings. "system" is the phone's own font. */
+val AppFonts = listOf(
+    "system" to "Match system",
+    "Inter" to "Inter",
+    "Manrope" to "Manrope",
+    "Outfit" to "Outfit",
+    "Nunito" to "Nunito",
+    "DM Serif Display" to "Serif",
+)
+
+private val googleFonts = androidx.compose.ui.text.googlefonts.GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = com.sonora.player.R.array.com_google_android_gms_fonts_certs,
+)
+
+/**
+ * The family for [name]. Google Fonts are downloaded and cached by Play services (no app size cost); until one
+ * arrives, or without Play services, text simply shows in the system font.
+ */
+fun appFontFamily(name: String): androidx.compose.ui.text.font.FontFamily {
+    if (name == "system") return androidx.compose.ui.text.font.FontFamily.Default
+    val font = androidx.compose.ui.text.googlefonts.GoogleFont(name)
+    val weights = if (name == "DM Serif Display") listOf(FontWeight.Normal)
+        else listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold)
+    return androidx.compose.ui.text.font.FontFamily(weights.map { androidx.compose.ui.text.googlefonts.Font(font, googleFonts, it) })
+}
+
+/** The app's font, for the few places with their own text styles (lyrics). */
+val LocalAppFontFamily = androidx.compose.runtime.staticCompositionLocalOf<androidx.compose.ui.text.font.FontFamily> {
+    androidx.compose.ui.text.font.FontFamily.Default
+}
+
+/** Every style of [t] in [family]. */
+private fun Typography.withFont(family: androidx.compose.ui.text.font.FontFamily): Typography = copy(
+    displayLarge = displayLarge.copy(fontFamily = family), displayMedium = displayMedium.copy(fontFamily = family),
+    displaySmall = displaySmall.copy(fontFamily = family), headlineLarge = headlineLarge.copy(fontFamily = family),
+    headlineMedium = headlineMedium.copy(fontFamily = family), headlineSmall = headlineSmall.copy(fontFamily = family),
+    titleLarge = titleLarge.copy(fontFamily = family), titleMedium = titleMedium.copy(fontFamily = family),
+    titleSmall = titleSmall.copy(fontFamily = family), bodyLarge = bodyLarge.copy(fontFamily = family),
+    bodyMedium = bodyMedium.copy(fontFamily = family), bodySmall = bodySmall.copy(fontFamily = family),
+    labelLarge = labelLarge.copy(fontFamily = family), labelMedium = labelMedium.copy(fontFamily = family),
+    labelSmall = labelSmall.copy(fontFamily = family),
+)
+
 /** iOS-flavoured type scale: heavy large titles, tight tracking, comfortable body text. */
 private val AppTypography = Typography().let { t ->
     t.copy(
@@ -130,5 +175,11 @@ fun SonoraTheme(settings: AppSettings, content: @Composable () -> Unit) {
     if (dark && settings.amoled && settings.dynamicColor) {
         scheme = scheme.copy(background = Color.Black, surface = Color.Black, surfaceContainerLowest = Color.Black)
     }
-    MaterialTheme(colorScheme = scheme, typography = AppTypography, content = content)
+    val family = androidx.compose.runtime.remember(settings.fontStyle) { appFontFamily(settings.fontStyle) }
+    val typography = androidx.compose.runtime.remember(family) {
+        if (settings.fontStyle == "system") AppTypography else AppTypography.withFont(family)
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalAppFontFamily provides family) {
+        MaterialTheme(colorScheme = scheme, typography = typography, content = content)
+    }
 }

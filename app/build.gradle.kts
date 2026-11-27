@@ -15,8 +15,8 @@ android {
         applicationId = "com.sonora.player"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.1.0"
     }
 
     // Release signing: a private key kept out of Git (keystore.properties + sonora-release.jks in the project root).
@@ -93,6 +93,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.cast)
+    implementation(libs.androidx.ui.text.google.fonts)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
 

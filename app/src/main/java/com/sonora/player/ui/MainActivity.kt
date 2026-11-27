@@ -181,7 +181,11 @@ class MainActivity : ComponentActivity() {
             val settings by vm.settings.collectAsStateWithLifecycle()
             SonoraTheme(settings) {
                 if (inMapMode.value) com.sonora.player.ui.drive.MapModeWindow(vm)
-                else SonoraAppUi(vm, openPlayer)
+                else {
+                    SonoraAppUi(vm, openPlayer)
+                    // Offers a newer release from GitHub (checked quietly, at most every few hours).
+                    com.sonora.player.ui.components.UpdatePrompt(vm.c.updater)
+                }
             }
         }
     }
@@ -606,31 +610,20 @@ private fun DockTabs(nav: NavHostController, actions: UiActions) {
     val idx = tabs.indexOfFirst { it.route == current }
     if (idx >= 0 && idx != lastTab) lastTab = idx
     val sel = lastTab
-    Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 8.dp)) {
-        tabs.forEachIndexed { i, tab ->
-            val selected = i == sel
-            val color by androidx.compose.animation.animateColorAsState(
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                label = "tabColor",
+    // Waterline: the selected tab sits in a drop of water that flows to the tab you pick.
+    val waterTabs = remember {
+        tabs.mapIndexed { i, t ->
+            com.sonora.player.ui.components.WaterTab(
+                t.icon, t.label,
+                when (i) { 0 -> com.sonora.player.ui.components.TabFx.HOP; 1 -> com.sonora.player.ui.components.TabFx.SPIN; else -> com.sonora.player.ui.components.TabFx.WAVE },
             )
-            Column(
-                Modifier.weight(1f).fillMaxHeight()
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                    ) { actions.tab(tab.route) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-            ) {
-                LIcon(tab.icon, tab.label, tint = color, size = 22.dp)
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    tab.label, color = color, style = MaterialTheme.typography.labelSmall,
-                    fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
-                )
-            }
         }
     }
+    val dark = with(MaterialTheme.colorScheme.background) { (0.299f * red + 0.587f * green + 0.114f * blue) < 0.5f }
+    com.sonora.player.ui.components.WaterlineTabs(
+        waterTabs, sel, onSelect = { actions.tab(tabs[it].route) }, dark = dark,
+        modifier = Modifier.fillMaxWidth().height(58.dp),
+    )
 }
 
 @Composable

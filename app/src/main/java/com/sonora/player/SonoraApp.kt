@@ -65,6 +65,8 @@ class AppContainer(val app: Application) {
     val youtube = com.sonora.player.youtube.YouTubeRepository(app, http, scope)
     val mixes = com.sonora.player.data.MixEngine(youtube, library, history, stats)
     val ambient by lazy { com.sonora.player.data.AmbientRepository(app, http) }
+    /** Self-update from GitHub Releases. */
+    val updater by lazy { com.sonora.player.data.Updater(app, http) }
 
     @get:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     val mediaDatabase: androidx.media3.database.StandaloneDatabaseProvider by lazy {

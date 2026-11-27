@@ -157,6 +157,41 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
                     }
                 }
             }
+            row {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconSquare(L.drawable.lucide_ic_type, IosColors.Blue)
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text("Font", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                "Match system follows your phone's font style",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    // Each option previews in its own font.
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        com.sonora.player.ui.theme.AppFonts.forEach { (key, label) ->
+                            val selected = s.fontStyle == key
+                            val fam = remember(key) { com.sonora.player.ui.theme.appFontFamily(key) }
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelLarge.copy(fontFamily = fam),
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+                                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest)
+                                    .clickable { set.set(Keys.fontStyle, key) }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
+            }
             if (Build.VERSION.SDK_INT >= 31) {
                 row { IosToggleRow("Material You colours", L.drawable.lucide_ic_palette, IosColors.Orange, s.dynamicColor, subtitle = "Use your wallpaper's colours instead of Sonora's") { set.set(Keys.dynamicColor, it) } }
             }
@@ -304,8 +339,8 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
             row { ListenBrainzRow(vm) }
         }
 
-        IosGroup("About", largeTitle = true) {
-            row { IosRow("Sonora", L.drawable.lucide_ic_audio_lines, IosColors.Pink, detail = BuildConfig.VERSION_NAME, chevron = false) }
+        IosGroup("Updates", largeTitle = true, footer = "Updates come from Sonora's GitHub releases. Android only installs them when they're signed by Sonora, and asks you to confirm.") {
+            row { com.sonora.player.ui.components.UpdatePanel(vm.c.updater) }
         }
         com.sonora.player.ui.components.MadeWithLove()
         // The birds in Home's sky are real photos.

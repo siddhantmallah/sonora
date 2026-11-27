@@ -68,6 +68,8 @@ data class AppSettings(
     /** -100 (left) .. 100 (right) */
     val balance: Int = 0,
     val monoAudio: Boolean = false,
+    /** App font: "system" follows the phone's font (incl. Samsung font styles); otherwise a Google Font. */
+    val fontStyle: String = "system",
 )
 
 /** Folders that hold voice notes and call recordings rather than music. Matched as path fragments. */
@@ -107,6 +109,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
         val preampDb = intPreferencesKey("preamp_db")
         val balance = intPreferencesKey("balance")
         val monoAudio = booleanPreferencesKey("mono_audio")
+        val fontStyle = stringPreferencesKey("font_style")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -142,6 +145,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
             preampDb = p[Keys.preampDb] ?: d.preampDb,
             balance = p[Keys.balance] ?: d.balance,
             monoAudio = p[Keys.monoAudio] ?: d.monoAudio,
+            fontStyle = p[Keys.fontStyle] ?: d.fontStyle,
         )
     }
 

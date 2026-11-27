@@ -808,7 +808,7 @@ private fun LyricsPanel(vm: MainViewModel, song: Song, positionState: androidx.c
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 lyrics.lines.filter { it.text.isNotBlank() }.forEach { line ->
-                    Text(line.text, style = PlainLyricStyle, color = White.copy(alpha = 0.88f))
+                    Text(line.text, style = PlainLyricStyle.copy(fontFamily = com.sonora.player.ui.theme.LocalAppFontFamily.current), color = White.copy(alpha = 0.88f))
                 }
             }
             LyricsFooter(lyrics, synced = false, timing = false, onTiming = {}, onSearch = onSearch, onOffset = null)
@@ -895,7 +895,7 @@ private fun LyricsPanel(vm: MainViewModel, song: Song, positionState: androidx.c
                             active && line.words.isNotEmpty() -> KaraokeLine(line, lyrics.offsetMs, vm.c.playerConnection, playing, live, mod)
                             else -> {
                                 val alpha by animateFloatAsState(if (active) 1f else if (i < current) 0.30f else 0.42f, tween(350), label = "lyric-alpha")
-                                Text(line.text, style = LyricStyle, color = White.copy(alpha = alpha), modifier = mod)
+                                Text(line.text, style = LyricStyle.copy(fontFamily = com.sonora.player.ui.theme.LocalAppFontFamily.current), color = White.copy(alpha = alpha), modifier = mod)
                             }
                         }
                     }
@@ -1130,7 +1130,7 @@ private fun KaraokeLine(line: com.sonora.player.lyrics.LyricLine, offsetMs: Long
     val wordPaths = remember(line) { arrayOfNulls<androidx.compose.ui.graphics.Path>(line.words.size) }
     val fx = remember(line) { VoiceFx(line.words.size) }
     Text(
-        plain, style = LyricStyle, color = Color.Transparent,
+        plain, style = LyricStyle.copy(fontFamily = com.sonora.player.ui.theme.LocalAppFontFamily.current), color = Color.Transparent,
         onTextLayout = { layout[0] = it; wordPaths.fill(null); fx.bounds.fill(null) },
         modifier = modifier.drawWithContent {
             val lay = layout[0] ?: return@drawWithContent
