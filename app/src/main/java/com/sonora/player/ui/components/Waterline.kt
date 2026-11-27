@@ -5,6 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -93,7 +95,28 @@ fun WaterlineTabs(
     val cell = if (size.width > 0) (size.width - 2 * padPx) / tabs.size else 0f
     fun centerOf(i: Int) = padPx + cell * (i + 0.5f)
 
-    LaunchedEffect(selected, size) {
+    // Dragging along the bar: the drop follows the finger; the tab under it lights up; release opens it.
+    var dragX by remember { mutableStateOf<Float?>(null) }
+    var snap by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    fun nearest(x: Float) = ((x - padPx) / cell).toInt().coerceIn(0, tabs.lastIndex)
+    val hover = dragX?.let { if (cell > 0f) nearest(it) else null }
+    LaunchedEffect(hover) { if (hover != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    LaunchedEffect(dragX) {
+        val x = dragX ?: return@LaunchedEffect
+        water.follow(x.coerceIn(centerOf(0), centerOf(tabs.lastIndex)))
+        var last = 0L
+        while (water.busy()) {
+            withFrameNanos { now ->
+                val dt = if (last == 0L) 1f / 60f else ((now - last) / 1e9f).coerceIn(0f, 1f / 30f)
+                last = now
+                water.step(dt)
+                clock[0] += dt
+                frame++
+            }
+        }
+    }
+
+    LaunchedEffect(selected, size, snap) {
         if (size.width <= 0f) return@LaunchedEffect
         val r = min(with(density) { 22.dp.toPx() }, size.height / 2 - with(density) { 5.dp.toPx() })
         val q = max(0f, (cell - with(density) { 10.dp.toPx() }) / 2 - r)
@@ -111,7 +134,24 @@ fun WaterlineTabs(
         frame++
     }
 
-    Box(modifier.onSizeChanged { size = Size(it.width.toFloat(), it.height.toFloat()) }) {
+    Box(
+        modifier.onSizeChanged { size = Size(it.width.toFloat(), it.height.toFloat()) }
+            .pointerInput(tabs.size) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragX = it.x },
+                    onHorizontalDrag = { change, dx -> change.consume(); dragX = (dragX ?: change.position.x) + dx },
+                    onDragEnd = {
+                        val x = dragX
+                        dragX = null
+                        if (x != null && cell > 0f) {
+                            val i = nearest(x)
+                            if (i != selected) onSelect(i) else snap++
+                        }
+                    },
+                    onDragCancel = { dragX = null; snap++ },
+                )
+            },
+    ) {
         Canvas(Modifier.fillMaxSize()) {
             @Suppress("UNUSED_EXPRESSION") frame
             val sh = shader
@@ -120,7 +160,7 @@ fun WaterlineTabs(
         }
         Row(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
             tabs.forEachIndexed { i, tab ->
-                val isSel = i == selected
+                val isSel = i == (hover ?: selected)
                 // Unselected tabs sit on clear glass over busy pages, so they get a stronger tone than usual.
                 val tint = if (isSel) onAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
                 val p = fx[i].value
@@ -247,6 +287,16 @@ private class WaterSim {
         put(1, tail.x, cy, q * (1f - 0.8f * thin), r * (1f - 0.5f * thin)); sq[1] = sy
         drops.take(4).forEachIndexed { i, d -> put(2 + i, d.x, d.y, 0f, d.r) }
         ripples.takeLast(6).forEachIndexed { i, rp -> rip[i * 4] = rp.x / scale; rip[i * 4 + 1] = rp.y / scale; rip[i * 4 + 2] = rp.age; rip[i * 4 + 3] = rp.amp }
+    }
+
+    /** Finger on the bar: the head chases the finger (the tail and droplets follow as usual). */
+    fun follow(x: Float) {
+        if (!ready) return
+        if (abs(x - tx) > 0.5f) {
+            if (!moving) { lead = if (abs(x - a.x) <= abs(x - b.x)) 0 else 1; lagLeft = 0.05f; split = false }
+            moving = true
+        }
+        tx = x
     }
 
     fun busy() = moving || drops.isNotEmpty() || ripples.isNotEmpty() || abs(sy - 1f) > 0.002f || abs(a.x - tx) > 0.3f || abs(b.x - tx) > 0.3f

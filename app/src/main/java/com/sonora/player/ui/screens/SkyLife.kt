@@ -1,5 +1,6 @@
 package com.sonora.player.ui.screens
 
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.foundation.Canvas
@@ -224,6 +225,8 @@ private object BirdSprites {
 private fun DrawScope.drawSprite(
     art: BirdArt, frame: Int, x: Float, y: Float, width: Float, dir: Float, tilt: Float, squash: Float,
     alpha: Float, filter: androidx.compose.ui.graphics.ColorFilter?,
+    /** -1..1: wing position for single-photo birds (up > 0). Their wings are cut at the shoulders and beat. */
+    wing: Float = 0f,
 ) {
     val img = art.frames[((frame % art.frames.size) + art.frames.size) % art.frames.size]
     val w = width
@@ -234,6 +237,10 @@ private fun DrawScope.drawSprite(
         rotate(tilt, Offset.Zero)
         scale(if (flip) -1f else 1f, squash, Offset.Zero)
     }) {
+        if (art.frames.size == 1 && wing != 0f) {
+            drawFlappingPhoto(img, w, h, wing, alpha, filter)
+            return@withTransform
+        }
         drawImage(
             img,
             srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
@@ -245,6 +252,38 @@ private fun DrawScope.drawSprite(
             filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
         )
     }
+}
+
+/**
+ * A one-photo bird with real wingbeats: the photo is cut into left wing, body and right wing; each wing pivots at
+ * its shoulder (up and down together) and foreshortens as it swings, while the body stays put and bobs a little.
+ */
+private fun DrawScope.drawFlappingPhoto(
+    img: androidx.compose.ui.graphics.ImageBitmap, w: Float, h: Float, wing: Float, alpha: Float,
+    filter: androidx.compose.ui.graphics.ColorFilter?,
+) {
+    val iw = img.width; val ih = img.height
+    val lEnd = 0.42f; val rStart = 0.58f
+    val angle = 30f * wing
+    val fore = 1f - 0.22f * kotlin.math.abs(wing)
+    val left = -w / 2; val top = -h / 2
+    val a = alpha.coerceIn(0f, 1f)
+    fun part(x0: Float, x1: Float) {
+        val sx = (x0 * iw).toInt(); val sw = ((x1 - x0) * iw).toInt().coerceAtLeast(1)
+        drawImage(
+            img, srcOffset = androidx.compose.ui.unit.IntOffset(sx, 0), srcSize = androidx.compose.ui.unit.IntSize(sw, ih),
+            dstOffset = androidx.compose.ui.unit.IntOffset((left + x0 * w).toInt(), top.toInt()),
+            dstSize = androidx.compose.ui.unit.IntSize((sw * w / iw).toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1)),
+            alpha = a, colorFilter = filter, filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
+        )
+    }
+    // Left wing: pivot at the left shoulder; a clockwise turn lifts its tip.
+    val lPivot = Offset(left + lEnd * w, 0f)
+    withTransform({ rotate(angle, lPivot); scale(1f, fore, lPivot) }) { part(0f, lEnd + 0.03f) }
+    val rPivot = Offset(left + rStart * w, 0f)
+    withTransform({ rotate(-angle, rPivot); scale(1f, fore, rPivot) }) { part(rStart - 0.03f, 1f) }
+    // Body last, on top of the wing roots; it dips as the wings push down.
+    translate(0f, wing * h * 0.06f) { part(lEnd - 0.06f, rStart + 0.06f) }
 }
 
 // Small deterministic hash -> [0, 1).
@@ -348,7 +387,10 @@ private fun DrawScope.drawFlock(bird: Bird, slot: Int, inSlot: Float, wind: Floa
                 val y = baseY + sin(a) * r * 0.32f + i * 14f * d
                 val heading = if (-sin(a) * dir >= 0) 1f else -1f
                 val kiteArt = art[Bird.KITE]
-                if (kiteArt != null) drawSprite(kiteArt, 0, x, y, s * 2.5f * (0.9f + i * 0.06f), heading, -sin(a) * 12f, 1f, edge, light)
+                // Soaring: wings held with a slight flex, and every so often a few strong beats.
+                val burst = ((sin(inSlot * 0.35f + i * 1.9f) - 0.82f) / 0.18f).coerceIn(0f, 1f)
+                val kw = 0.12f * sin(inSlot * 1.7f + i) + burst * 0.7f * sin(inSlot * 9f + i)
+                if (kiteArt != null) drawSprite(kiteArt, 0, x, y, s * 2.5f * (0.9f + i * 0.06f), heading, -sin(a) * 12f, 1f, edge, light, wing = kw)
                 else drawKite(x, y, s * (0.9f + i * 0.06f), heading, inSlot + i, color.copy(alpha = color.alpha * edge), path)
             }
         }
@@ -410,8 +452,8 @@ private fun DrawScope.drawFlock(bird: Bird, slot: Int, inSlot: Float, wind: Floa
                 if (a != null) {
                     // Many wing frames: cycle them to flap. A single glider photo: flex it a touch instead.
                     val fr = if (a.frames.size > 1) (phase / (2f * PI.toFloat()) * a.frames.size).toInt() + i * 3 else 0
-                    val squash = if (a.frames.size > 1) 1f else 1f - (if (a.glides) 0.05f else 0.18f) * (0.5f + 0.5f * flap)
-                    drawSprite(a, fr, x, y, s * 2.4f * depth, dir, sin(inSlot * 1.4f + i * 0.9f) * 6f, squash, edge * (0.75f + 0.25f * depth), light)
+                    val wing = if (a.frames.size > 1) 0f else if (flap == 0.15f) 0.08f else flap
+                    drawSprite(a, fr, x, y, s * 2.4f * depth, dir, sin(inSlot * 1.4f + i * 0.9f) * 6f, 1f, edge * (0.75f + 0.25f * depth), light, wing = wing)
                 } else drawFlapper(bird, x, y, s * depth, flap, dir, color.copy(alpha = color.alpha * edge * (0.7f + 0.3f * depth)), path)
             }
         }

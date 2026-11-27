@@ -15,8 +15,8 @@ android {
         applicationId = "com.sonora.player"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.2.0"
+        versionCode = 6
+        versionName = "1.2.1"
     }
 
     // Release signing: a private key kept out of Git (keystore.properties + sonora-release.jks in the project root).
