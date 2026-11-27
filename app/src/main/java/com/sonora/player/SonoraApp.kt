@@ -55,6 +55,8 @@ class AppContainer(val app: Application) {
     val output = AudioOutputMonitor(app)
     val queueStore = QueueStore(app)
     val audioTap = com.sonora.player.playback.AudioTap()
+    /** Live settings for Sonora's audio stage (Enhance, pre-amp, balance, mono). */
+    val dsp = com.sonora.player.playback.DspParams()
 
     val http: okhttp3.OkHttpClient = okhttp3.OkHttpClient.Builder()
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)

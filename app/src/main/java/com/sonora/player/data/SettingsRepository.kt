@@ -58,6 +58,16 @@ data class AppSettings(
     // Playback extras
     val crossfadeSec: Int = 0,
     val listenBrainzToken: String = "",
+    // Sonora's own audio stage (see playback/SonoraDsp.kt)
+    /** 0 = off, 1 = auto (lossy sources only), 2 = always. */
+    val enhanceMode: Int = 1,
+    /** 0..100 */
+    val enhanceAmount: Int = 50,
+    /** -12..0 dB of headroom before the effects. */
+    val preampDb: Int = 0,
+    /** -100 (left) .. 100 (right) */
+    val balance: Int = 0,
+    val monoAudio: Boolean = false,
 )
 
 /** Folders that hold voice notes and call recordings rather than music. Matched as path fragments. */
@@ -92,6 +102,11 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
         val ytDataSaverWifi = booleanPreferencesKey("yt_data_saver_wifi")
         val crossfadeSec = intPreferencesKey("crossfade_sec")
         val listenBrainzToken = stringPreferencesKey("listenbrainz_token")
+        val enhanceMode = intPreferencesKey("enhance_mode")
+        val enhanceAmount = intPreferencesKey("enhance_amount")
+        val preampDb = intPreferencesKey("preamp_db")
+        val balance = intPreferencesKey("balance")
+        val monoAudio = booleanPreferencesKey("mono_audio")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -122,6 +137,11 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
             ytDataSaverWifi = p[Keys.ytDataSaverWifi] ?: d.ytDataSaverWifi,
             crossfadeSec = p[Keys.crossfadeSec] ?: d.crossfadeSec,
             listenBrainzToken = p[Keys.listenBrainzToken] ?: d.listenBrainzToken,
+            enhanceMode = p[Keys.enhanceMode] ?: d.enhanceMode,
+            enhanceAmount = p[Keys.enhanceAmount] ?: d.enhanceAmount,
+            preampDb = p[Keys.preampDb] ?: d.preampDb,
+            balance = p[Keys.balance] ?: d.balance,
+            monoAudio = p[Keys.monoAudio] ?: d.monoAudio,
         )
     }
 

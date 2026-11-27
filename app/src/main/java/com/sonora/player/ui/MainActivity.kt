@@ -413,10 +413,11 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
                         }
                     } else {
                         if (wideLandscape()) {
-                            // Landscape: pages sit in a centred column of comfortable width (no stretched cards or
-                            // text lines), clear of the camera cut-out.
-                            Box(Modifier.fillMaxSize().displayCutoutPadding(), contentAlignment = Alignment.TopCenter) {
-                                AppNavHost(nav, actions, Modifier.fillMaxHeight().widthIn(max = 760.dp).fillMaxWidth())
+                            // Landscape: pages use the full width (a centred column left bare strips at both sides,
+                            // cutting off the sky, shelves and lists), kept clear of the camera cut-out. Grids add
+                            // columns instead of stretching (see isLandscapeWide).
+                            Box(Modifier.fillMaxSize().displayCutoutPadding()) {
+                                AppNavHost(nav, actions, Modifier.fillMaxSize())
                             }
                         } else {
                             AppNavHost(nav, actions, Modifier.fillMaxSize())

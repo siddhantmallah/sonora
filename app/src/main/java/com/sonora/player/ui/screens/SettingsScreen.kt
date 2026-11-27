@@ -190,6 +190,86 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
             row { IosToggleRow("Battery saver", L.drawable.lucide_ic_battery_charging, IosColors.Green, s.audioOffload, subtitle = "Audio offload · disables EQ and visualizer") { set.set(Keys.audioOffload, it) } }
         }
 
+        IosGroup(
+            "Sonora Enhance", largeTitle = true,
+            footer = if (s.bitPerfectUsb) "Off while Bit-perfect USB DAC is on: nothing touches the samples."
+            else "Lossy audio (streams, MP3, AAC, Opus) loses its top end and some sparkle. Enhance regenerates the highs " +
+                "the codec cut off, adds a touch of warmth and width, and stops anything from clipping. It can't turn a " +
+                "128 kbps stream into true 320 kbps (that detail is gone), but it brings back much of the feel. Auto " +
+                "leaves lossless files untouched.",
+        ) {
+            row {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconSquare(L.drawable.lucide_ic_sparkles, IosColors.Pink)
+                        Spacer(Modifier.width(14.dp))
+                        Text("Enhance", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    PillTabs(listOf(0 to "Off", 1 to "Auto", 2 to "Always"), s.enhanceMode, sidePadding = 0.dp, idle = MaterialTheme.colorScheme.surfaceContainerHighest) {
+                        set.set(Keys.enhanceMode, it)
+                    }
+                }
+            }
+            if (s.enhanceMode != 0) row {
+                var local by remember(s.enhanceAmount) { androidx.compose.runtime.mutableFloatStateOf(s.enhanceAmount.toFloat()) }
+                Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconSquare(L.drawable.lucide_ic_sparkles, IosColors.Purple)
+                        Spacer(Modifier.width(14.dp))
+                        Text("Strength", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(
+                            when { local < 34 -> "Subtle"; local < 67 -> "Balanced"; else -> "Rich" },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    ThinSlider(local.toInt(), 0..100, Modifier.padding(vertical = 6.dp), onChange = { local = it.toFloat() }) {
+                        set.set(Keys.enhanceAmount, it)
+                    }
+                }
+            }
+        }
+
+        IosGroup(
+            "For audiophiles", largeTitle = true,
+            footer = "Pre-amp lowers the level before the equalizer and Enhance, so big boosts never clip. Balance and " +
+                "Mono help with one-sided hearing or a single earbud.",
+        ) {
+            row {
+                var local by remember(s.preampDb) { androidx.compose.runtime.mutableFloatStateOf(s.preampDb.toFloat()) }
+                Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconSquare(L.drawable.lucide_ic_gauge, IosColors.Orange)
+                        Spacer(Modifier.width(14.dp))
+                        Text("Pre-amp", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(if (local > -0.5f) "0 dB" else "${local.toInt()} dB", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    ThinSlider(local.toInt(), -12..0, Modifier.padding(vertical = 6.dp), onChange = { local = it.toFloat() }) {
+                        set.set(Keys.preampDb, it)
+                    }
+                }
+            }
+            row {
+                var local by remember(s.balance) { androidx.compose.runtime.mutableFloatStateOf(s.balance.toFloat()) }
+                Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconSquare(L.drawable.lucide_ic_headphones, IosColors.Teal)
+                        Spacer(Modifier.width(14.dp))
+                        Text("Balance", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(
+                            when { local < -2 -> "L ${-local.toInt()}%"; local > 2 -> "R ${local.toInt()}%"; else -> "Centre" },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    ThinSlider(local.toInt(), -100..100, Modifier.padding(vertical = 6.dp), onChange = { local = it.toFloat() }) {
+                        // Snap back to dead centre when close.
+                        set.set(Keys.balance, if (kotlin.math.abs(it) <= 4) 0 else it)
+                    }
+                }
+            }
+            row { IosToggleRow("Mono audio", L.drawable.lucide_ic_speaker, IosColors.Gray, s.monoAudio, subtitle = "Both ears get the full mix") { set.set(Keys.monoAudio, it) } }
+        }
+
         Text(
             "BLUETOOTH & LDAC", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 32.dp, top = 22.dp, bottom = 7.dp),

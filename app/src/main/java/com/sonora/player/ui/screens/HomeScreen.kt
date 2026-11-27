@@ -153,10 +153,11 @@ fun HomeScreen(vm: MainViewModel, actions: UiActions) {
                 }.take(6)
                 if (tiles.isNotEmpty()) {
                     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tiles.chunked(2).forEach { row ->
+                        val perRow = if (com.sonora.player.ui.components.isLandscapeWide()) 3 else 2
+                        tiles.chunked(perRow).forEach { row ->
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 row.forEach { ShortcutTile(it, Modifier.weight(1f)) }
-                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
@@ -529,7 +530,9 @@ private fun TrendingSection(charts: Map<String, List<com.sonora.player.youtube.Y
             transitionSpec = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) togetherWith androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)) },
         ) { songs ->
             val rows = 4
-            val colWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp - 52.dp
+            // One column per screen width in portrait; sideways, columns of a readable width side by side.
+            val screenW = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp - 52.dp
+            val colWidth = if (com.sonora.player.ui.components.isLandscapeWide()) minOf(screenW, 380.dp) else screenW
             androidx.compose.foundation.lazy.grid.LazyHorizontalGrid(
                 androidx.compose.foundation.lazy.grid.GridCells.Fixed(rows),
                 modifier = Modifier.fillMaxWidth().height(62.dp * rows),

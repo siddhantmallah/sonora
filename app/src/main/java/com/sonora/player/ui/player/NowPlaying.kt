@@ -1873,6 +1873,8 @@ private fun LandscapeStage(
                     StageTab(L.drawable.lucide_ic_mic_vocal, "Lyrics", selected = showLyrics) { onShowLyrics(true) }
                 }
                 Spacer(Modifier.weight(1f))
+                GlassCircle(L.drawable.lucide_ic_cast, "Cast and output") { openSheet(Sheet.OUTPUT) }
+                Spacer(Modifier.width(8.dp))
                 GlassCircle(L.drawable.lucide_ic_list_music, "Queue") { openSheet(Sheet.QUEUE) }
                 Spacer(Modifier.width(8.dp))
                 GlassCircle(L.drawable.lucide_ic_ellipsis, "More") { openSheet(Sheet.MORE) }

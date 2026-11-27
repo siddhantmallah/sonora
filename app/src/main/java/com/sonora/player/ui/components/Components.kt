@@ -505,3 +505,10 @@ fun TopCircle(@DrawableRes icon: Int, label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) { LIcon(icon, label, size = 20.dp) }
 }
+
+/** Phone held sideways (or any wide window): screens add grid columns rather than stretching cards. */
+@androidx.compose.runtime.Composable
+fun isLandscapeWide(): Boolean {
+    val c = androidx.compose.ui.platform.LocalConfiguration.current
+    return c.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE && c.screenWidthDp >= 600
+}

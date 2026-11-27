@@ -213,6 +213,8 @@ private fun SearchHome(vm: MainViewModel, actions: UiActions, history: SearchHis
             profile.topArtists.getOrNull(1)?.let { add("Songs like ${it.name}") }
         }.distinct().take(5)
     }
+    // Sideways there's room for four mood tiles a row instead of two.
+    val moodCols = if (com.sonora.player.ui.components.isLandscapeWide()) 4 else 2
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = com.sonora.player.ui.components.bottomBarSpace())) {
         if (history.items.isNotEmpty()) {
             item {
@@ -283,7 +285,7 @@ private fun SearchHome(vm: MainViewModel, actions: UiActions, history: SearchHis
             SectionHeader("Moods & genres")
             LaunchedEffect(Unit) { vm.loadMoods(moods.map { Triple(it.name, it.query, it.personal) }) }
         }
-        items(moods.chunked(2)) { row ->
+        items(moods.chunked(moodCols)) { row ->
             Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { m ->
                     val card = moodCards[m.name]
@@ -292,7 +294,7 @@ private fun SearchHome(vm: MainViewModel, actions: UiActions, history: SearchHis
                         card?.playlistId?.let { actions.yt(it) } ?: onQuery(m.query)
                     }
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                repeat(moodCols - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }

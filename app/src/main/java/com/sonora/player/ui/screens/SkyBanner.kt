@@ -168,11 +168,26 @@ half4 main(float2 fc) {
     float day = smoothstep(-0.10, 0.12, sunAlt);
     float low = (1.0 - smoothstep(0.0, 0.30, abs(sunAlt - 0.02))) * smoothstep(-0.22, -0.02, sunAlt);
 
-    float3 zen = mix(float3(0.006, 0.010, 0.032), float3(0.09, 0.33, 0.80), day);
-    float3 hor = mix(float3(0.025, 0.040, 0.090), float3(0.60, 0.79, 0.97), day);
-    zen = mix(zen, float3(0.14, 0.17, 0.38), low * 0.6);
-    hor = mix(hor, float3(1.0, 0.50, 0.20), low * 0.85);
-    float3 col = mix(hor, zen, pow(clamp(h, 0.0, 1.0), 0.55));
+    // Three bands (horizon, middle, zenith) for each light: day, golden hour, blue hour and night. Real skies are
+    // never a straight two-colour fade: the middle carries most of the hue, the horizon is pale (day), hot (dusk)
+    // or faintly lit by the city (night).
+    float blue = (1.0 - smoothstep(-0.02, 0.06, sunAlt)) * smoothstep(-0.24, -0.08, sunAlt);   // just after sunset
+    float3 zen = mix(float3(0.006, 0.010, 0.030), float3(0.07, 0.27, 0.72), day);
+    float3 mid = mix(float3(0.016, 0.028, 0.072), float3(0.26, 0.53, 0.90), day);
+    float3 hor = mix(float3(0.060, 0.070, 0.115), float3(0.68, 0.83, 0.98), day);
+    // Golden hour: indigo overhead, a dusty pink-violet middle, orange at the horizon.
+    zen = mix(zen, float3(0.13, 0.15, 0.36), low * 0.65);
+    mid = mix(mid, float3(0.55, 0.36, 0.58), low * 0.70);
+    hor = mix(hor, float3(1.00, 0.56, 0.26), low * 0.85);
+    // Blue hour: deep, saturated blue that settles into night.
+    zen = mix(zen, float3(0.035, 0.06, 0.20), blue * 0.7);
+    mid = mix(mid, float3(0.09, 0.15, 0.38), blue * 0.7);
+    float hh = clamp(h, 0.0, 1.0);
+    float3 col = mix(hor, mid, smoothstep(0.0, 0.42, hh));
+    col = mix(col, zen, smoothstep(0.30, 1.0, hh));
+    // Around sunrise / sunset the horizon burns brightest on the sun's side.
+    float side = exp(-abs(uv.x - sun.x / res.x) * 2.6);
+    col += float3(1.0, 0.45, 0.18) * pow(1.0 - hh, 3.0) * side * low * 0.55;
 
     // Sun glare (persists briefly after sunset as a horizon glow).
     float d = distance(fc, sun) / res.y;
@@ -242,7 +257,8 @@ half4 main(float2 fc) {
     // Slightly darker at the bottom so text stays readable; gentle filmic curve + grain.
     col *= 0.84 + 0.16 * smoothstep(0.0, 0.55, h);
     col = clamp(col, 0.0, 1.0);
-    col += (hash(fc + fract(t)) - 0.5) * 0.012;
+    // Dither (two hashes, triangular-ish noise of about one colour step) so dark gradients never band.
+    col += (hash(fc + fract(t)) + hash(fc * 1.37 + 7.1) - 1.0) * (1.6 / 255.0);
     return half4(half3(col), 1.0);
 }
 """

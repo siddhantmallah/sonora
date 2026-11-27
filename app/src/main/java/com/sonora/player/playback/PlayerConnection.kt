@@ -322,6 +322,20 @@ class PlayerConnection(private val context: Context) {
         )
     }
 
+    /** Plays the queue on a DLNA TV / speaker. */
+    fun castToDlna(device: com.sonora.player.cast.DlnaDevice) = withController {
+        it.sendCustomCommand(
+            SessionCommand(Commands.CAST_DLNA, Bundle.EMPTY),
+            Bundle().apply {
+                putString(Commands.ARG_NAME, device.name); putString(Commands.ARG_LOCATION, device.location)
+                putString(Commands.ARG_AV, device.avTransport); putString(Commands.ARG_RC, device.rendering)
+            },
+        )
+    }
+
+    /** Stops casting and carries on on the phone. */
+    fun stopCasting() = withController { it.sendCustomCommand(SessionCommand(Commands.STOP_CAST, Bundle.EMPTY), Bundle.EMPTY) }
+
     fun toggleFavorite() = withController {
         it.sendCustomCommand(SessionCommand(Commands.TOGGLE_FAVORITE, Bundle.EMPTY), Bundle.EMPTY)
     }

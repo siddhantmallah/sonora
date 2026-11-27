@@ -76,6 +76,9 @@ class PlaybackService : MediaLibraryService() {
 
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaLibrarySession
+    // Casting: Google Cast via Media3's CastPlayer (wraps the ExoPlayer), DLNA via the hub.
+    private var castPlayer: androidx.media3.cast.CastPlayer? = null
+    private lateinit var castHub: com.sonora.player.cast.CastHub
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val c by lazy { container }
 
@@ -95,6 +98,8 @@ class PlaybackService : MediaLibraryService() {
         val settings = runBlocking { c.settings.current() }
 
         val tap = c.audioTap
+        c.dsp.apply(settings)
+        scope.launch { c.settings.state.collect { c.dsp.apply(it) } }
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(
                 context: Context,
@@ -103,8 +108,9 @@ class PlaybackService : MediaLibraryService() {
             ): AudioSink = DefaultAudioSink.Builder(context)
                 .setEnableFloatOutput(enableFloatOutput)
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                // Feeds the visualizer and beat-reactive artwork; passes audio through untouched.
-                .setAudioProcessors(arrayOf(TapProcessor(tap)))
+                // Sonora's audio stage first (Enhance, pre-amp, balance, mono; a plain copy when all off), then
+                // the tap that feeds the visualizer, so it shows what you actually hear.
+                .setAudioProcessors(arrayOf(DspProcessor(c.dsp), TapProcessor(tap)))
                 .build()
         }
             // 32-bit float PCM keeps 24-bit / hi-res sources intact instead of truncating to 16-bit.
@@ -158,6 +164,8 @@ class PlaybackService : MediaLibraryService() {
                 decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?,
             ) {
                 extras.putString(Extras.CODEC, codecName(format.sampleMimeType))
+                // Auto Enhance only works on lossy sources.
+                c.dsp.lossySource = format.sampleMimeType !in LOSSLESS_MIMES
                 if (source == null) {
                     extras.putInt(Extras.SAMPLE_RATE, format.sampleRate.coerceAtLeast(0))
                     extras.putInt(Extras.CHANNELS, format.channelCount.coerceAtLeast(0))
@@ -201,7 +209,22 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-        session = MediaLibrarySession.Builder(this, player, LibraryCallback())
+        // Casting. The phone serves local songs and relays YouTube to the TV; CastPlayer hands playback over to a
+        // Chromecast / Google TV and back by itself (the hub rewrites the queue so the TV can reach every song).
+        val castServer = com.sonora.player.cast.CastServer(this, c.http) { vid ->
+            runCatching { c.youtube.resolver.resolve(vid, dataSaver = false, forCast = true).url }.getOrNull()
+        }
+        castHub = com.sonora.player.cast.CastHub(this, castServer, c.http)
+        castPlayer = runCatching {
+            androidx.media3.cast.CastPlayer.Builder(this)
+                .setLocalPlayer(player)
+                .setTransferCallback { from, to -> castHub.transfer(from, to) }
+                .build()
+        }.onFailure { android.util.Log.d("SonoraCast", "Cast unavailable: ${it.message}") }.getOrNull()
+        val sessionPlayer: androidx.media3.common.Player = castPlayer ?: player
+        castHub.sessionPlayer = sessionPlayer
+
+        session = MediaLibrarySession.Builder(this, sessionPlayer, LibraryCallback())
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(buttons(false))
             .build()
@@ -360,8 +383,10 @@ class PlaybackService : MediaLibraryService() {
         finishHistory()
         saveQueue()
         c.effects.release()
+        castHub.release()
         session.release()
-        player.release()
+        // CastPlayer releases the ExoPlayer it wraps.
+        castPlayer?.release() ?: player.release()
         scope.cancel()
         super.onDestroy()
     }
@@ -685,6 +710,8 @@ class PlaybackService : MediaLibraryService() {
                 .add(sleepCommand)
                 .add(favoriteCommand)
                 .add(SessionCommand(Commands.SET_OUTPUT, Bundle.EMPTY))
+                .add(SessionCommand(Commands.CAST_DLNA, Bundle.EMPTY))
+                .add(SessionCommand(Commands.STOP_CAST, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -715,6 +742,17 @@ class PlaybackService : MediaLibraryService() {
                     player.setPreferredAudioDevice(device)
                     c.output.preferredDeviceId = device?.id ?: -1
                     c.output.refresh()
+                }
+                Commands.CAST_DLNA -> {
+                    val device = com.sonora.player.cast.DlnaDevice(
+                        args.getString(Commands.ARG_NAME).orEmpty(), args.getString(Commands.ARG_LOCATION).orEmpty(),
+                        args.getString(Commands.ARG_AV).orEmpty(), args.getString(Commands.ARG_RC),
+                    )
+                    if (device.avTransport.isNotEmpty()) castHub.startDlna(device, player, this@PlaybackService.session)
+                }
+                Commands.STOP_CAST -> {
+                    castHub.stopDlna(player, this@PlaybackService.session)
+                    castHub.stopGoogleCast()
                 }
                 Commands.TOGGLE_FAVORITE -> {
                     val mediaId = player.currentMediaItem?.mediaId
@@ -835,3 +873,10 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 }
+
+/** Codecs that carry every bit of the original (Auto Enhance leaves these alone). */
+private val LOSSLESS_MIMES = setOf(
+    androidx.media3.common.MimeTypes.AUDIO_FLAC, androidx.media3.common.MimeTypes.AUDIO_ALAC,
+    androidx.media3.common.MimeTypes.AUDIO_RAW, androidx.media3.common.MimeTypes.AUDIO_WAV,
+    "audio/x-wav", "audio/x-flac", "audio/wav",
+)

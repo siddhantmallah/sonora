@@ -15,3 +15,6 @@
 -dontwarn com.google.re2j.**
 -dontwarn org.jspecify.**
 -dontwarn javax.annotation.**
+
+# Google Cast: the options provider is referenced only from the manifest.
+-keep class androidx.media3.cast.DefaultCastOptionsProvider { *; }

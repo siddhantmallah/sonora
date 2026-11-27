@@ -123,7 +123,8 @@ private fun iconFor(type: OutputType) = when (type) {
 @Composable
 fun OutputPill(vm: MainViewModel, onClick: () -> Unit) {
     val output by vm.output.collectAsStateWithLifecycle()
-    val label = buildString {
+    val casting by com.sonora.player.cast.CastState.target.collectAsStateWithLifecycle()
+    val label = casting?.name ?: buildString {
         append(if (output.type == OutputType.SPEAKER) "This phone" else output.deviceName ?: output.type.label)
         output.codec?.let { append(" · ").append(it.name) }
     }
@@ -133,7 +134,8 @@ fun OutputPill(vm: MainViewModel, onClick: () -> Unit) {
         color = Color.White.copy(alpha = if (output.type == OutputType.SPEAKER) 0.08f else 0.14f),
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 7.dp).widthIn(max = 200.dp), verticalAlignment = Alignment.CenterVertically) {
-            LIcon(iconFor(output.type), null, tint = if (output.codec?.isHighQuality == true) Brand.Gold else Color.White, size = 15.dp)
+            if (casting != null) LIcon(L.drawable.lucide_ic_cast, null, tint = Brand.Gold, size = 15.dp)
+            else LIcon(iconFor(output.type), null, tint = if (output.codec?.isHighQuality == true) Brand.Gold else Color.White, size = 15.dp)
             Spacer(Modifier.width(6.dp))
             Text(label, color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -208,12 +210,98 @@ fun androidx.compose.foundation.layout.BoxScope.OutputSheet(
             }
         }
 
+        Spacer(Modifier.height(12.dp))
+        CastSection(vm)
+
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GlassButton("Audio details", Modifier.weight(1f), onAudioDetails)
             GlassButton("Pair a device", Modifier.weight(1f)) {
                 runCatching { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
+        }
+    }
+}
+
+/**
+ * "Cast to": Chromecast / Google TV devices (found by Android's media router) and DLNA TVs and speakers (found on the
+ * Wi-Fi), in one list. While casting, the device shows at the top with a Stop button.
+ */
+@Composable
+private fun CastSection(vm: MainViewModel) {
+    val context = LocalContext.current
+    val dim = Color.White.copy(alpha = 0.62f)
+    val casting by com.sonora.player.cast.CastState.target.collectAsStateWithLifecycle()
+    val router = remember { runCatching { androidx.mediarouter.media.MediaRouter.getInstance(context) }.getOrNull() }
+    val selector = remember {
+        androidx.mediarouter.media.MediaRouteSelector.Builder()
+            .addControlCategory(
+                com.google.android.gms.cast.CastMediaControlIntent.categoryForCast(
+                    com.google.android.gms.cast.CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID,
+                ),
+            ).build()
+    }
+    var castRoutes by remember { mutableStateOf<List<androidx.mediarouter.media.MediaRouter.RouteInfo>>(emptyList()) }
+    DisposableEffect(router) {
+        val r = router
+        if (r == null) {
+            onDispose { }
+        } else {
+            fun refresh() { castRoutes = r.routes.filter { !it.isDefault && it.isEnabled && it.matchesSelector(selector) } }
+            val cb = object : androidx.mediarouter.media.MediaRouter.Callback() {
+                override fun onRouteAdded(router: androidx.mediarouter.media.MediaRouter, route: androidx.mediarouter.media.MediaRouter.RouteInfo) = refresh()
+                override fun onRouteRemoved(router: androidx.mediarouter.media.MediaRouter, route: androidx.mediarouter.media.MediaRouter.RouteInfo) = refresh()
+                override fun onRouteChanged(router: androidx.mediarouter.media.MediaRouter, route: androidx.mediarouter.media.MediaRouter.RouteInfo) = refresh()
+            }
+            r.addCallback(selector, cb, androidx.mediarouter.media.MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN)
+            refresh()
+            onDispose { r.removeCallback(cb) }
+        }
+    }
+    var dlna by remember { mutableStateOf<List<com.sonora.player.cast.DlnaDevice>>(emptyList()) }
+    var searching by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            searching = true
+            dlna = com.sonora.player.cast.DlnaDiscovery.discover(context, vm.c.http)
+            searching = false
+            kotlinx.coroutines.delay(15_000)
+        }
+    }
+    // A TV that speaks both shows once, as Google Cast (smoother hand-over).
+    val castNames = castRoutes.map { it.name }.toSet()
+    val dlnaShown = dlna.filter { it.name !in castNames }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Cast to", style = MaterialTheme.typography.titleSmall, color = dim, modifier = Modifier.weight(1f))
+        if (searching) Text("Searching…", style = MaterialTheme.typography.labelSmall, color = dim)
+    }
+    Spacer(Modifier.height(8.dp))
+    Column(Modifier.fillMaxWidth().glassGroup()) {
+        val now = casting
+        if (now != null) {
+            OutputRow(now.name, "Playing here now · tap to stop casting", L.drawable.lucide_ic_cast, true, divider = castRoutes.isNotEmpty() || dlnaShown.isNotEmpty()) {
+                vm.c.playerConnection.stopCasting()
+                router?.unselect(androidx.mediarouter.media.MediaRouter.UNSELECT_REASON_STOPPED)
+            }
+        }
+        castRoutes.filter { it.name != now?.name }.forEachIndexed { i, route ->
+            OutputRow(route.name, "Google Cast", L.drawable.lucide_ic_cast, false, divider = i < castRoutes.lastIndex || dlnaShown.isNotEmpty()) {
+                if (now?.kind == com.sonora.player.cast.CastTarget.Kind.DLNA) vm.c.playerConnection.stopCasting()
+                router?.selectRoute(route)
+            }
+        }
+        dlnaShown.filter { it.name != now?.name }.forEachIndexed { i, d ->
+            OutputRow(d.name, "DLNA · smart TV / speaker", L.drawable.lucide_ic_tv, false, divider = i < dlnaShown.lastIndex) {
+                if (now?.kind == com.sonora.player.cast.CastTarget.Kind.GOOGLE_CAST) router?.unselect(androidx.mediarouter.media.MediaRouter.UNSELECT_REASON_STOPPED)
+                vm.c.playerConnection.castToDlna(d)
+            }
+        }
+        if (now == null && castRoutes.isEmpty() && dlnaShown.isEmpty()) {
+            Text(
+                if (searching) "Looking for TVs and speakers on your Wi-Fi…" else "No TVs found. Make sure the TV is on and on the same Wi-Fi as this phone.",
+                style = MaterialTheme.typography.bodySmall, color = dim, modifier = Modifier.padding(14.dp),
+            )
         }
     }
 }

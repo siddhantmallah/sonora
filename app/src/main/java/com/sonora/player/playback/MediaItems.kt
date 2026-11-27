@@ -10,6 +10,14 @@ object Commands {
     const val SLEEP_TIMER = "sonora.SLEEP_TIMER"
     const val TOGGLE_FAVORITE = "sonora.TOGGLE_FAVORITE"
     const val SET_OUTPUT = "sonora.SET_OUTPUT"
+    /** Cast the queue to a DLNA renderer (args: name, location, AVTransport and RenderingControl addresses). */
+    const val CAST_DLNA = "sonora.CAST_DLNA"
+    /** Stop any casting (Google Cast or DLNA) and continue on the phone. */
+    const val STOP_CAST = "sonora.STOP_CAST"
+    const val ARG_NAME = "name"
+    const val ARG_LOCATION = "location"
+    const val ARG_AV = "av"
+    const val ARG_RC = "rc"
     const val ARG_DEVICE_ID = "device_id"
     const val ARG_MINUTES = "minutes"
     const val ARG_END_OF_TRACK = "end_of_track"

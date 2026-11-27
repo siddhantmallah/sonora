@@ -30,9 +30,13 @@ class StreamResolver(http: OkHttpClient) {
 
     fun invalidate(videoId: String) { cache.remove(videoId) }
 
-    /** Blocking; call from a background / loader thread. */
-    fun resolve(videoId: String, dataSaver: Boolean): ResolvedStream {
-        cache[videoId]?.takeIf { it.expiresAt > System.currentTimeMillis() }?.let { return it }
+    /**
+     * Blocking; call from a background / loader thread. [forCast] picks AAC (M4A) when there is one: TVs and DLNA
+     * renderers play AAC far more widely than Opus/WebM.
+     */
+    fun resolve(videoId: String, dataSaver: Boolean, forCast: Boolean = false): ResolvedStream {
+        val key = if (forCast) "cast:$videoId" else videoId
+        cache[key]?.takeIf { it.expiresAt > System.currentTimeMillis() }?.let { return it }
         val extractor = ServiceList.YouTube.getStreamExtractor("https://www.youtube.com/watch?v=$videoId")
         extractor.fetchPage()
         val streams = extractor.audioStreams
@@ -40,10 +44,11 @@ class StreamResolver(http: OkHttpClient) {
             .filter { it.audioTrackType == null || it.audioTrackType == AudioTrackType.ORIGINAL }
             .ifEmpty { extractor.audioStreams.filter { it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP } }
         if (streams.isEmpty()) throw IOException("No playable audio stream for $videoId")
+        val candidates = if (forCast) streams.filter { it.format == org.schabi.newpipe.extractor.MediaFormat.M4A }.ifEmpty { streams } else streams
         // NewPipe gives averageBitrate in kbps but bitrate in bps; compare (and report) both in bps.
         fun bps(st: org.schabi.newpipe.extractor.stream.AudioStream): Int =
             st.averageBitrate.takeIf { it > 0 }?.let { if (it < 10_000) it * 1000 else it } ?: st.bitrate.coerceAtLeast(0)
-        val pick = if (dataSaver) streams.minBy { bps(it) } else streams.maxBy { bps(it) }
+        val pick = if (dataSaver) candidates.minBy { bps(it) } else candidates.maxBy { bps(it) }
         val url = pick.content
         val expire = Uri.parse(url).getQueryParameter("expire")?.toLongOrNull()?.times(1000)
             ?: (System.currentTimeMillis() + 5 * 3600_000L)
@@ -55,7 +60,7 @@ class StreamResolver(http: OkHttpClient) {
             expiresAt = expire - 10 * 60_000L,
         )
         Log.d("SonoraYT", "Resolved $videoId → ${resolved.codec} ${resolved.bitrate / 1000} kbps")
-        cache[videoId] = resolved
+        cache[key] = resolved
         return resolved
     }
 }
