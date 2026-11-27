@@ -413,10 +413,10 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
                         }
                     } else {
                         if (wideLandscape()) {
-                            // Landscape: pages use the full width (a centred column left bare strips at both sides,
-                            // cutting off the sky, shelves and lists), kept clear of the camera cut-out. Grids add
-                            // columns instead of stretching (see isLandscapeWide).
-                            Box(Modifier.fillMaxSize().displayCutoutPadding()) {
+                            // Landscape: pages use the full width, edge to edge (a centred column, or padding for the
+                            // camera hole on one side, left bare strips that cut off the sky, shelves and lists).
+                            // Grids add columns instead of stretching (see isLandscapeWide).
+                            Box(Modifier.fillMaxSize()) {
                                 AppNavHost(nav, actions, Modifier.fillMaxSize())
                             }
                         } else {

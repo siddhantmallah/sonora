@@ -1,77 +1,82 @@
-# Sonora: offline-first music player for Android
+# Sonora
 
-Kotlin · Jetpack Compose · Media3 (ExoPlayer) · Room · Glance widgets. Min Android 8.0, targets Android 16.
+**A music player for Android that plays your own files and YouTube Music, with live visualizers, voice-driven lyrics, casting to any TV, and an audio stage built for people who care how music sounds.**
 
-## What's in this first version
+Kotlin · Jetpack Compose · Media3 (ExoPlayer). Android 8.0+, targets Android 16.
 
-**Playback engine** (`playback/PlaybackService.kt`)
-- Media3 ExoPlayer in a `MediaLibraryService`: background play, media notification with a ❤ favourite button, lock screen, headset/Bluetooth buttons, **Android Auto** browsing, Wear OS controls
-- Gapless playback, audio focus, pauses when headphones are unplugged
-- **Hi-Res pipeline**: 32-bit float output keeps 24-bit / 96–192 kHz files intact
-- **Bit-perfect USB DAC** mode (Android 14+)
-- Real source format read from FLAC/WAV headers → "Hi-Res · FLAC · 24-bit / 96 kHz" badge
-- Shows the actual output format (float/16-bit, sample rate, offload)
-- Remembers the queue and position across restarts; Bluetooth "play" resumes the last session
-- Sleep timer with a 10-second fade-out, or "stop at end of song"
-- Playback speed and pitch, skip silence, battery-saver audio offload
+## Download
 
-**Bluetooth & LDAC** (`playback/AudioOutputMonitor.kt`)
-- Detects speaker / wired / Bluetooth / USB DAC and the device name
-- Reads the negotiated Bluetooth codec (LDAC 990/660/330 kbps, aptX HD, AAC, SBC, LC3…) where Android allows it
-- Links straight to Developer options to set LDAC to 990 kbps / 96 kHz / 24-bit.
-  *No app can force LDAC: the phone and headphones negotiate it. What an app can do is feed it an untouched hi-res stream, which Sonora does.*
+**[⬇ Download Sonora (APK)](https://github.com/siddhantmallah/sonora/releases/latest/download/Sonora.apk)**, or see all versions on the [Releases](https://github.com/siddhantmallah/sonora/releases) page.
 
-**Equalizer & effects** (`playback/AudioEffectsController.kt`)
-- Device equalizer bands + presets, bass boost, virtualizer, loudness enhancer
-- Exposes the audio session to Wavelet / Dolby / system EQs
+To install: open the APK on your phone and allow "Install unknown apps" for your browser or file manager when Android asks. Sonora isn't on the Play Store (see [YouTube Music](#youtube-music) below).
 
-**Lyrics** (`lyrics/Lyrics.kt`)
-- Time-synced lyrics with auto-scroll, tap a line to seek, ±0.5 s offset correction
-- Sources, in order: saved, embedded tags (ID3 USLT/TXXX, FLAC Vorbis), sidecar `.lrc`, then **LRCLIB** online (free, no key)
-- Automatic matching by title + artist + album + duration, with title cleanup ("Remastered", "feat."…)
-- "Match lyrics" dialog to pick a different result manually, and import of `.lrc` files
+## Screenshots
 
-**Library & discovery**
-- Songs / Albums / Artists / Playlists / Genres / Folders, sorting, auto-rescan when files change
-- Home: daily "Made for you" mixes, Jump back in, Recently added, Your artists, On repeat, Rediscover
-- Smart playlists: Favorites, Most played, Recently played, Recently added, Never played
-- Playlists with drag-to-reorder; play-count tracking
-- Accent-insensitive multi-word instant search
-- "Open with Sonora" for audio files from file managers
+<p>
+  <img src="docs/screenshots/home.jpg" width="24%" alt="Home with a live sky, weather and regional birds">
+  <img src="docs/screenshots/visualizer.jpg" width="24%" alt="Neon Orb visualizer reacting to the music">
+  <img src="docs/screenshots/lyrics.jpg" width="24%" alt="Synced lyrics, with the sung word lifted by the singer's voice">
+  <img src="docs/screenshots/enhance.jpg" width="24%" alt="Sonora Enhance and audiophile settings">
+</p>
+<p>
+  <img src="docs/screenshots/landscape-visualizer.jpg" width="49%" alt="Landscape player with the Wireframe visualizer across the page">
+  <img src="docs/screenshots/landscape-lyrics.jpg" width="49%" alt="Landscape lyrics on the album-colour sky">
+</p>
 
-**Look & feel**
-- Material You colours, light/dark/system, pure-black AMOLED mode
-- Now Playing tinted by album-art colours, blurred artwork backdrop, swipe the cover to skip
-- Queue sheet with drag-to-reorder, remove and clear-upcoming
+## Features
 
-**Widgets** (`widget/Widgets.kt`)
-- *Sonora player*: resizable compact, wide and large layouts with controls
-- *Sonora cover*: artwork tile with play button
+**Play anything**
+- Your local library (songs, albums, artists, playlists, genres, folders) with instant accent-insensitive search
+- YouTube Music: search, browse, your feed, likes and playlists when signed in, radio-style autoplay, downloads
+- Gapless playback, crossfade, sleep timer with fade-out, speed and pitch, skip silence
+- Background play, notification and lock-screen controls, Android Auto, Wear OS, home-screen widgets
 
-## Build & install
+**Cast to any TV**
+- **Google Cast**: Chromecast, Google TV / Android TV and Cast-enabled TVs
+- **DLNA**: most Samsung, LG, Sony, Panasonic smart TVs and many network speakers
+- One "Cast to" list in the player; your queue moves to the TV and comes back to the phone where it left off
+- Local songs and YouTube audio are streamed from the phone over your Wi-Fi while casting
+
+**Sound**
+- **Sonora Enhance**: lossy audio (streams, MP3, AAC, Opus) loses its top end. Enhance regenerates the highs the codec cut off, adds a touch of warmth and width, and has a soft limiter so nothing clips. *Auto* runs only on lossy sources. (It can't turn a 128 kbps stream into true 320 kbps, since that detail is gone, but it brings back much of the feel.)
+- **For audiophiles**: Hi-Res 32-bit float output (24-bit / 96–192 kHz untouched), bit-perfect USB DAC mode, pre-amp headroom, balance, mono
+- Equalizer, bass boost, virtualizer and loudness; real codec / sample-rate / bitrate shown for every track
+- Bluetooth codec readout (LDAC, aptX HD, AAC…) where Android allows it
+
+**See the music**
+- Visualizers driven by the audio you're actually hearing (in sync, not on a loop): **Neon Orb**, **Wireframe** sphere, **Terrain**
+- Full-screen in portrait and landscape, blending into the page
+
+**Lyrics**
+- Time-synced lyrics from LRCLIB, embedded tags or `.lrc` files, with timing correction and manual matching
+- **Voice-driven words**: the word being sung swells, thickens and glows with the singer's actual voice; held notes stretch; whispers stay soft
+- Works in right-to-left scripts and in landscape
+
+**Home**
+- A live sky for your time of day: real sun and moon positions, clouds and weather for where you are, golden hour and blue hour
+- Flocks of real birds that change with your region, the season, the weather and the time of day
+- Daily mixes, Your Replay, recently played and recommendations
+
+## Build
 
 Open the folder in Android Studio, or from a terminal:
 
 ```powershell
-.\gradlew.bat assembleDebug
-adb install -r app\build\outputs\apk\debug\app-debug.apk
+.\gradlew.bat assembleRelease
+adb install -r app\build\outputs\apk\release\app-release.apk
 ```
 
-`assembleRelease` produces a shrunk ~3.5 MB APK, signed with the debug key. Replace the signing config in `app/build.gradle.kts` before publishing.
+Release builds are signed with the key in `keystore.properties` / `sonora-release.jks` when they exist (both are kept out of Git). Without them a release build falls back to the debug key, so it still installs.
 
-## Roadmap
+## YouTube Music
 
-1. **YouTube Music**: needs a decision between an unofficial full client and the official API only (see below)
-2. ReplayGain / volume normalisation, crossfade
-3. Tag editor, embedded-art extraction for files without MediaStore art
-4. Lyrics widget, Last.fm scrobbling, Chromecast
-5. Library backup/restore of playlists and stats
+Sonora plays YouTube Music through an unofficial client (InnerTube + NewPipe Extractor), the same approach as ViMusic or Metrolist. That's why it's distributed as an APK rather than on the Play Store, and why a YouTube change can occasionally need an app update.
 
-### YouTube Music: the two options
+## Credits
 
-| | Unofficial client (InnerTube + NewPipe Extractor, like ViMusic/Metrolist) | Official YouTube Data API |
-|---|---|---|
-| Stream the YT Music catalogue in-app | ✅ background, audio-only | ❌ (only the official embedded video player) |
-| Your library, likes, playlists | ✅ via sign-in | ✅ read playlists/likes |
-| Play Store | ❌ violates YouTube ToS; sideload only | ✅ |
-| Stability | Breaks when YouTube changes; needs updates | Stable |
+- Lyrics: [LRCLIB](https://lrclib.net)
+- YouTube Music streams: [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor)
+- Bird photos: public-domain / CC0 images from Wikimedia Commons
+- Moon texture: NASA Lunar Reconnaissance Orbiter
+
+Made with ♥ by Mr.Blanko
