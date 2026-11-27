@@ -1,5 +1,7 @@
 package com.sonora.player.ui.aod
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -160,6 +162,74 @@ fun AlwaysOnFace(onClose: (() -> Unit)?) {
     }
 }
 
+/**
+ * Always-On for the road: your next turn big at the top, the live map in the middle, the song and big controls at
+ * the bottom, on black. Keeps the screen on at your normal brightness so it reads in daylight.
+ */
+@Composable
+fun DriveAlwaysOnFace(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val c = remember { (context.applicationContext as SonoraApp).container }
+    val state by c.playerConnection.state.collectAsState()
+    val journey by com.sonora.player.ui.drive.NavJourney.state.collectAsState()
+    val now by produceState(System.currentTimeMillis()) { while (true) { value = System.currentTimeMillis(); delay(1000L - value % 1000L) } }
+    val is24 = remember { DateFormat.is24HourFormat(context) }
+    val time = remember(now / 60_000, is24) { DateFormat.format(if (is24) "HH:mm" else "h:mm", Date(now)).toString() }
+    val located = remember { com.sonora.player.ui.drive.hasLocation(context) }
+    androidx.compose.runtime.DisposableEffect(located) {
+        if (located) com.sonora.player.ui.drive.DriveSession.start(context, c.http)
+        onDispose { if (located) com.sonora.player.ui.drive.DriveSession.stop() }
+    }
+    val info by com.sonora.player.ui.drive.DriveSession.info.collectAsState()
+    val trip by com.sonora.player.ui.drive.Trip.state.collectAsState()
+    val trafficKey = com.sonora.player.ui.drive.trafficKey(c.settings.state.collectAsState().value)
+    val fontName = c.settings.state.collectAsState().value.fontStyle
+    val font = remember(fontName) { appFontFamily(fontName) }
+    Column(Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 16.dp, vertical = 30.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(time, color = Color.White.copy(alpha = 0.9f), fontSize = 44.sp, fontWeight = FontWeight.Light, fontFamily = font)
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.12f))
+                    .clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) { Icon(painterResource(L.drawable.lucide_ic_x), "Close", tint = Color.White, modifier = Modifier.size(22.dp)) }
+        }
+        Spacer(Modifier.height(10.dp))
+        journey?.let { com.sonora.player.ui.drive.JourneyCard(it, Modifier.fillMaxWidth(), large = true) }
+        trip?.let { com.sonora.player.ui.drive.TripBar(it, Modifier.fillMaxWidth().padding(top = 8.dp)) }
+        Spacer(Modifier.height(10.dp))
+        if (located) Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp))) {
+            com.sonora.player.ui.drive.LiveMap(Modifier.fillMaxSize(), trafficKey = trafficKey)
+            Column(Modifier.align(Alignment.TopStart).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                com.sonora.player.ui.drive.WeatherChip(info)
+                com.sonora.player.ui.drive.RiderChip(info)
+            }
+            Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.sonora.player.ui.drive.AlertBanner(info.alerts)
+                com.sonora.player.ui.drive.SpeedBadge(info, large = true)
+            }
+        }
+        else Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(14.dp))
+        if (state.hasMedia) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Artwork(state.artUri, Modifier.size(64.dp), RoundedCornerShape(14.dp))
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(state.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, fontFamily = font, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(state.artist, color = Color(0xFFB8B8B8), fontSize = 16.sp, fontFamily = font, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                AodButton(L.drawable.lucide_ic_skip_back, "Previous", 36) { c.playerConnection.previous() }
+                AodButton(if (state.isPlaying) L.drawable.lucide_ic_pause else L.drawable.lucide_ic_play, "Play/pause", 50) { c.playerConnection.togglePlay() }
+                AodButton(L.drawable.lucide_ic_skip_forward, "Next", 36) { c.playerConnection.next() }
+            }
+        }
+    }
+}
+
 @Composable
 private fun AodButton(icon: Int, label: String, size: Int, onClick: () -> Unit) {
     Box(
@@ -176,14 +246,16 @@ class AlwaysOnActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.attributes = window.attributes.apply { screenBrightness = 0.12f }
+        val drive = intent.getBooleanExtra(EXTRA_DRIVE, false)
+        // On the road it has to read in daylight: keep your normal brightness there.
+        if (!drive) window.attributes = window.attributes.apply { screenBrightness = 0.12f }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         c.playerConnection.attach(this)
-        setContent { AlwaysOnFace(onClose = { finish() }) }
+        setContent { if (drive) DriveAlwaysOnFace { finish() } else AlwaysOnFace(onClose = { finish() }) }
     }
 
     override fun onDestroy() {
@@ -192,7 +264,9 @@ class AlwaysOnActivity : ComponentActivity() {
     }
 
     companion object {
-        fun open(context: Context) = context.startActivity(Intent(context, AlwaysOnActivity::class.java))
+        private const val EXTRA_DRIVE = "drive"
+        fun open(context: Context, drive: Boolean = false) =
+            context.startActivity(Intent(context, AlwaysOnActivity::class.java).putExtra(EXTRA_DRIVE, drive))
     }
 }
 

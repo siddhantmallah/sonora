@@ -183,11 +183,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
             SonoraTheme(settings) {
-                if (inMapMode.value) com.sonora.player.ui.drive.MapModeWindow(vm)
-                else {
+                // The app stays composed under the floating Map-mode window, so expanding it brings you straight
+                // back to where you were (Driving mode), not to Home.
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
                     SonoraAppUi(vm, openPlayer)
+                    if (inMapMode.value) com.sonora.player.ui.drive.MapModeWindow(vm)
                     // Offers a newer release from GitHub (checked quietly, at most every few hours).
-                    com.sonora.player.ui.components.UpdatePrompt(vm.c.updater)
+                    else com.sonora.player.ui.components.UpdatePrompt(vm.c.updater)
                 }
             }
         }
@@ -330,6 +332,9 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
     val currentRoute = nav.currentBackStackEntryAsState().value?.destination?.route
     val heroRoutes = remember { setOf("playlist/{id}", "genre/{name}", "folder/{path}", "yt/{id}", "album/{id}", "artist/{name}") }
     val immersive = currentRoute == Routes.DRIVE
+    // Music playing and you're moving faster than 20 km/h: straight into Driving mode.
+    val autoDriveOn = vm.settings.collectAsStateWithLifecycle().value.autoDrive
+    val playingNow = vm.player.collectAsStateWithLifecycle().value.isPlaying
     // Home's sky runs up behind the status bar.
     val edgeToEdge = immersive || currentRoute == Routes.HOME || currentRoute == Routes.SEARCH || currentRoute == Routes.LIBRARY || currentRoute == Routes.SETTINGS || currentRoute == Routes.EQUALIZER || currentRoute == Routes.CONNECTIONS || currentRoute == Routes.LIKED || currentRoute == Routes.DOWNLOADS || currentRoute == Routes.REPLAY || currentRoute in heroRoutes
     val player by vm.player.collectAsStateWithLifecycle()
@@ -376,6 +381,10 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
     }
     val actions = remember(nav, songActions) {
         UiActions(vm, nav, songActions, addToPlaylist = { playlistTarget = it }, openPlayer = { showPlayer = true })
+    }
+    com.sonora.player.ui.drive.AutoDriveWatcher(active = autoDriveOn && playingNow, inDrive = immersive) {
+        showPlayer = false
+        actions.drive()
     }
     val deepLink by DeepLink.target.collectAsStateWithLifecycle()
     val appContext = androidx.compose.ui.platform.LocalContext.current

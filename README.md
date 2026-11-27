@@ -73,6 +73,19 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 - **Long-press the app icon**: Lyrics, Up next, Search, Liked songs, Always-On, Shuffle all
 - **Always-On screen**: a dim clock, the song and its lyrics on pure black, drifting so nothing burns in. Open it from the player, or pick Sonora as the screen saver to have it show while charging
 
+**Driving mode** (for cars and bikes)
+- Big controls and a live map that follows you like a sat-nav, turning with you and tilting ahead
+- **Where to?**: search a place (or pick a saved or recent one), choose car or bike, and Sonora draws the whole route with distance, time left and arrival, rerouting if you leave it; *Voice* hands the same trip to Google Maps for spoken turns
+- Opens by itself when music is playing and you're moving faster than 20 km/h (while Sonora is on screen)
+- **Your Google Maps journey**: the next turn, distance and arrival from Google Maps (or Waze, OsmAnd…) shown on Sonora's map
+- **Live traffic** colours on the roads, toll plazas ahead, and how many minutes traffic is costing you
+- **Speed** from GPS with the road's **speed limit** (red when you're over), and **weather ahead**: rain, storms, fog or strong wind on the road before you reach it
+- **Phone sensors**: compass heading when slow, lean angle and g-force for riders, altitude
+- **Drive Always-On**: the map, your next turn, speed and music on a black screen that stays on
+- Map mode floats Sonora over your nav app and brings you straight back to Driving mode
+
+*Map data © OpenStreetMap contributors (OpenFreeMap tiles); places by Photon, routes by Valhalla (openstreetmap.de), speed limits and tolls via Overpass, weather by Open-Meteo, traffic by TomTom. Searches and routes send the place and your approximate position to those services; Sonora reads only navigation apps' notifications, with your permission.*
+
 **Home**
 - A live sky for your time of day: real sun and moon positions, clouds and weather for where you are, golden hour and blue hour
 - Flocks of real birds that change with your region, the season, the weather and the time of day

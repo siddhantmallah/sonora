@@ -1,5 +1,6 @@
 package com.sonora.player.ui.drive
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
 import com.sonora.player.ui.player.glassPill
 import androidx.compose.animation.core.tween
@@ -139,6 +140,28 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
     val skyTarget = remember(clock / 600_000, weather) { lerp(com.sonora.player.ui.screens.skyWash(clock, weather), Color.Black, 0.35f) }
     val sky by animateColorAsState(skyTarget, tween(900), label = "driveSky")
 
+    // Live map + the journey your navigation app is guiding.
+    val journey by NavJourney.state.collectAsStateWithLifecycle()
+    var located by remember { mutableStateOf(hasLocation(context)) }
+    var navAccess by remember { mutableStateOf(NavJourney.hasAccess(context)) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        located = hasLocation(context)
+        navAccess = NavJourney.hasAccess(context)
+        NavJourney.reconnect(context)
+        onPauseOrDispose { }
+    }
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { located = hasLocation(context) }
+    val showMap = located
+    // GPS speed, speed limits, sensors, weather and tolls ahead: only while Driving mode is on screen.
+    DisposableEffect(located) {
+        if (located) DriveSession.start(context, vm.c.http)
+        onDispose { if (located) DriveSession.stop() }
+    }
+    val info by DriveSession.info.collectAsStateWithLifecycle()
+    val trip by Trip.state.collectAsStateWithLifecycle()
+    val appSettings by vm.settings.collectAsStateWithLifecycle()
+    var whereTo by remember { mutableStateOf(false) }
+
     Box(Modifier.fillMaxSize().background(base)) {
         // The artwork, blurred softly into the lower half, under today's sky at the top — like Home's hero.
         Artwork(state.artUri, Modifier.fillMaxSize().blur(56.dp).graphicsLayer { alpha = 0.35f }, RoundedCornerShape(0.dp))
@@ -155,17 +178,64 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
                 GlassButton(L.drawable.lucide_ic_chevron_down, "Exit driving mode", 52) { actions.back() }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Row(
-                        Modifier.glassPill(RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 8.dp),
+                        Modifier.glassPill(RoundedCornerShape(50))
+                            .then(if (showMap) Modifier.clickable { whereTo = true } else Modifier)
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        LIcon(L.drawable.lucide_ic_car, null, tint = Color.White.copy(alpha = 0.85f), size = 16.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Driving", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                        LIcon(if (showMap) L.drawable.lucide_ic_search else L.drawable.lucide_ic_car, null, tint = Color.White.copy(alpha = 0.85f), size = 18.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (showMap) trip?.dest?.name ?: "Where to?" else "Driving", color = Color.White,
+                            style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
                 GlassButton(L.drawable.lucide_ic_map, "Map mode", 52, onClick = openMaps)
             }
 
+            if (showMap) {
+                // The live map, with your next turn on top of it and the time in the corner.
+                Box(Modifier.fillMaxWidth().weight(1f).padding(top = 6.dp).clip(RoundedCornerShape(26.dp))) {
+                    LiveMap(Modifier.fillMaxSize(), trafficKey = trafficKey(appSettings))
+                    // Top: weather here and the rider readout (Google Maps' own pop-up can sit over this briefly).
+                    Column(Modifier.align(Alignment.TopStart).padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        WeatherChip(info)
+                        RiderChip(info)
+                    }
+                    // Live traffic works out of the box (Sonora's built-in key); the chip just turns it on and off.
+                    val trafficLive = trafficKey(appSettings) != null
+                    if (hasBuiltInTraffic || appSettings.tomtomKey.isNotBlank()) Text(
+                        if (trafficLive) "Traffic on" else "Traffic off",
+                        color = if (trafficLive) Color.Black else Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).clip(RoundedCornerShape(50))
+                            .background(if (trafficLive) Color(0xFF34C759) else Color.Black.copy(alpha = 0.68f))
+                            .clickable { vm.c.settings.set(com.sonora.player.data.SettingsRepository.Keys.trafficOn, !appSettings.trafficOn) }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                    // Bottom (clear of Google's pop-up): warnings, your next turn, your trip, speed and limit.
+                    Column(
+                        Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AlertBanner(info.alerts)
+                        val j = journey
+                        if (j != null) JourneyCard(j, Modifier.fillMaxWidth())
+                        trip?.let { TripBar(it, Modifier.fillMaxWidth()) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SpeedBadge(info)
+                            Spacer(Modifier.weight(1f))
+                            if (j == null && !navAccess) JourneyAccessChip()
+                            else Text(
+                                DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(clock)), color = Color.White, fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
+                }
+            } else {
             // Home-style sky header: the time big, then the day, weather and air at a glance.
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.Bottom) {
                 Text(
@@ -185,6 +255,21 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
                     (weather?.place?.let { " · $it" } ?: ""),
                 color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyLarge,
             )
+            journey?.let { JourneyCard(it, Modifier.fillMaxWidth().padding(top = 12.dp)) }
+            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    Modifier.glassPill(RoundedCornerShape(50))
+                        .clickable { askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION)) }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LIcon(L.drawable.lucide_ic_map, null, tint = Color.White, size = 18.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Show a live map", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                if (!navAccess && journey == null) JourneyAccessChip()
+            }
+            }
 
             // Now playing: swipe the artwork to skip.
             var drag by remember { mutableFloatStateOf(0f) }
@@ -200,7 +285,7 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
             ) {
                 Artwork(
                     state.artUri,
-                    Modifier.size(132.dp)
+                    Modifier.size(if (showMap) 84.dp else 132.dp)
                         .graphicsLayer {
                             translationX = drag * 0.4f; alpha = 1f - (kotlin.math.abs(drag) / 600f).coerceAtMost(0.5f)
                             shadowElevation = 18.dp.toPx(); shape = RoundedCornerShape(18.dp); clip = true
@@ -210,8 +295,9 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
                 Spacer(Modifier.width(18.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        state.title.ifBlank { "Nothing playing" }, color = Color.White, fontSize = 30.sp, lineHeight = 34.sp,
-                        fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        state.title.ifBlank { "Nothing playing" }, color = Color.White,
+                        fontSize = if (showMap) 24.sp else 30.sp, lineHeight = if (showMap) 28.sp else 34.sp,
+                        fontWeight = FontWeight.Bold, maxLines = if (showMap) 1 else 2, overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(state.artist, color = Color.White.copy(alpha = 0.7f), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -229,7 +315,7 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
                     }
                 }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(if (showMap) 12.dp else 20.dp))
             // Progress in the album's colours, like the player's seek bar.
             Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.15f))) {
                 Box(Modifier.fillMaxWidth(progress).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(Brush.horizontalGradient(bright)))
@@ -237,20 +323,20 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
 
             // Giant transport controls: glass circles around a solid play button.
             Row(
-                Modifier.fillMaxWidth().weight(1f),
+                Modifier.fillMaxWidth().then(if (showMap) Modifier.height(140.dp) else Modifier.weight(1f)),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                GlassButton(L.drawable.lucide_ic_skip_back, "Previous", 96) { conn.previous() }
+                GlassButton(L.drawable.lucide_ic_skip_back, "Previous", if (showMap) 76 else 96) { conn.previous() }
                 Box(
-                    Modifier.size(140.dp)
+                    Modifier.size(if (showMap) 112.dp else 140.dp)
                         .graphicsLayer { shadowElevation = 24.dp.toPx(); shape = CircleShape; clip = true }
                         .background(Color.White).clickable { conn.togglePlay() },
                     contentAlignment = Alignment.Center,
                 ) {
                     LIcon(if (state.isPlaying) L.drawable.lucide_ic_pause else L.drawable.lucide_ic_play, "Play or pause", tint = Color.Black, size = 58.dp)
                 }
-                GlassButton(L.drawable.lucide_ic_skip_forward, "Next", 96) { conn.next() }
+                GlassButton(L.drawable.lucide_ic_skip_forward, "Next", if (showMap) 76 else 96) { conn.next() }
             }
 
             // Big action tiles.
@@ -268,6 +354,9 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
                         )
                     }
                 }
+                Tile("Always-On", L.drawable.lucide_ic_clock, Modifier.weight(1f)) {
+                    com.sonora.player.ui.aod.AlwaysOnActivity.open(context, drive = true)
+                }
                 Tile("Maps", L.drawable.lucide_ic_navigation, Modifier.weight(1f), onClick = openMaps)
             }
 
@@ -277,7 +366,7 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
                 addAll(feed.dailyMixes)
                 feed.discover?.let { add(it) }
             }
-            if (mixes.isNotEmpty()) {
+            if (mixes.isNotEmpty() && !showMap) {
                 Text(
                     "FOR THE ROAD", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.55f),
                     modifier = Modifier.padding(start = 4.dp, top = 18.dp, bottom = 8.dp),
@@ -297,6 +386,7 @@ fun DriveScreen(vm: MainViewModel, actions: UiActions) {
                 }
             } else Spacer(Modifier.height(14.dp))
         }
+        if (whereTo) WhereToSheet { whereTo = false }
     }
 }
 

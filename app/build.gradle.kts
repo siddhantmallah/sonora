@@ -15,9 +15,20 @@ android {
         applicationId = "com.sonora.player"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.4.2"
+        versionCode = 11
+        versionName = "1.5.0"
+        // Service keys built into the app, read from secrets.properties (kept out of Git). Users never enter them.
+        val secrets = Properties().apply {
+            val f = rootProject.file("secrets.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+        buildConfigField("String", "TOMTOM_KEY", "\"${secrets.getProperty("tomtom.key", "").trim()}\"")
+        // The map engine is native code: ship phones' ARM builds only (keeps the APK small).
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
+
+    // Compress the map engine's native code inside the APK: a much smaller download from GitHub.
+    packaging { jniLibs { useLegacyPackaging = true } }
 
     // Release signing: a private key kept out of Git (keystore.properties + sonora-release.jks in the project root).
     // Without them (e.g. a fresh clone) release builds fall back to the debug key so they still install.
@@ -94,6 +105,7 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.cast)
     implementation(libs.androidx.ui.text.google.fonts)
+    implementation(libs.maplibre.android)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
 

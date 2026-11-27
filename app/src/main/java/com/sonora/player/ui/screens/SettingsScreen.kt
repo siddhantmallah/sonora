@@ -204,6 +204,7 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
         ) {
             row { IosRow("Equalizer & effects", L.drawable.lucide_ic_sliders_horizontal, IosColors.Blue, detail = if (s.eqEnabled) "On" else "Off") { actions.equalizer() } }
             row { IosRow("Driving mode", L.drawable.lucide_ic_car, IosColors.Gray, subtitle = "Big controls, voice and Map mode") { actions.drive() } }
+            row { IosToggleRow("Open Driving mode when you drive", L.drawable.lucide_ic_gauge, IosColors.Blue, s.autoDrive, subtitle = "Music playing and over 20 km/h, while Sonora is open") { set.set(Keys.autoDrive, it) } }
             row {
                 var local by remember(s.crossfadeSec) { androidx.compose.runtime.mutableFloatStateOf(s.crossfadeSec.toFloat()) }
                 Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp)) {

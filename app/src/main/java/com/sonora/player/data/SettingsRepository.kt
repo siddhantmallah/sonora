@@ -76,6 +76,12 @@ data class AppSettings(
     val smartMix: Boolean = true,
     /** The line being sung under the title on the now-playing pill (notification, lock screen, Now Bar). */
     val cardLyrics: Boolean = true,
+    /** Your own free TomTom key for live traffic in Driving mode (stays on the phone). */
+    val tomtomKey: String = "",
+    /** Live traffic colours on Driving mode's map. */
+    val trafficOn: Boolean = true,
+    /** Open Driving mode by itself when music plays and you move faster than 20 km/h. */
+    val autoDrive: Boolean = true,
 )
 
 /** Folders that hold voice notes and call recordings rather than music. Matched as path fragments. */
@@ -119,6 +125,9 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
         val liveUpdate = booleanPreferencesKey("live_update")
         val smartMix = booleanPreferencesKey("smart_mix")
         val cardLyrics = booleanPreferencesKey("card_lyrics")
+        val tomtomKey = stringPreferencesKey("tomtom_key")
+        val trafficOn = booleanPreferencesKey("traffic_on")
+        val autoDrive = booleanPreferencesKey("auto_drive")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -158,6 +167,9 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
             liveUpdate = p[Keys.liveUpdate] ?: d.liveUpdate,
             smartMix = p[Keys.smartMix] ?: d.smartMix,
             cardLyrics = p[Keys.cardLyrics] ?: d.cardLyrics,
+            tomtomKey = p[Keys.tomtomKey] ?: d.tomtomKey,
+            trafficOn = p[Keys.trafficOn] ?: d.trafficOn,
+            autoDrive = p[Keys.autoDrive] ?: d.autoDrive,
         )
     }
 
