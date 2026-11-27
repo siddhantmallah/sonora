@@ -24,8 +24,11 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
   <img src="docs/screenshots/enhance.jpg" width="19%" alt="Sonora Enhance and audiophile settings">
 </p>
 <p>
-  <img src="docs/screenshots/landscape-visualizer.jpg" width="49%" alt="Landscape player with the Wireframe visualizer across the page">
-  <img src="docs/screenshots/landscape-lyrics.jpg" width="49%" alt="Landscape lyrics on the album-colour sky">
+  <img src="docs/screenshots/landscape-home.jpg" width="98%" alt="Home sideways: the sky edge to edge, a kite in flight and the liquid volt tab bar">
+</p>
+<p>
+  <img src="docs/screenshots/landscape-visualizer.jpg" width="49%" alt="Landscape player: Neon Orb visualizer with the Visualizer / Lyrics switch">
+  <img src="docs/screenshots/landscape-lyrics.jpg" width="49%" alt="Landscape lyrics, the sung word lifted by the singer's voice">
 </p>
 
 ## Features
