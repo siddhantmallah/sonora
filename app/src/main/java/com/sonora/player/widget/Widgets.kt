@@ -125,8 +125,11 @@ object WidgetBridge {
 
     /** Connects a short-lived controller to the service and runs [block] on it. */
     suspend fun control(context: Context, block: (MediaController) -> Unit) = withContext(Dispatchers.Main) {
-        val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
-        val controller = MediaController.Builder(context, token).buildAsync().await()
+        // A widget tap runs inside a broadcast receiver, which Android doesn't allow to bind services: connect
+        // through the app's context instead.
+        val app = context.applicationContext
+        val token = SessionToken(app, ComponentName(app, PlaybackService::class.java))
+        val controller = MediaController.Builder(app, token).buildAsync().await()
         try {
             // The service restores the last queue on start; give it a moment when cold-starting.
             var waited = 0
@@ -320,6 +323,10 @@ private fun WideLayout(data: WidgetData) {
 
 @Composable
 private fun LargeLayout(data: WidgetData) {
+    // Fit the height it's given: room for "Up next" and big artwork only when the widget is tall enough.
+    val h = LocalSize.current.height
+    val roomy = h >= 240.dp
+    val art = if (roomy) 112.dp else if (h >= 205.dp) 88.dp else 68.dp
     Box(GlanceModifier.fillMaxSize().cornerRadius(28.dp)) {
         Backdrop(data)
         Column(GlanceModifier.fillMaxSize().padding(16.dp)) {
@@ -337,13 +344,13 @@ private fun LargeLayout(data: WidgetData) {
             }
             Spacer(GlanceModifier.height(6.dp))
             Row(GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
-                ArtImage(data, GlanceModifier.size(112.dp).cornerRadius(22.dp).clickable(actionStartActivity<MainActivity>()))
+                ArtImage(data, GlanceModifier.size(art).cornerRadius(20.dp).clickable(actionStartActivity<MainActivity>()))
                 Spacer(GlanceModifier.width(16.dp))
                 Column(GlanceModifier.defaultWeight().fillMaxHeight().clickable(actionStartActivity<MainActivity>()), verticalAlignment = Alignment.CenterVertically) {
                     Text(data.title ?: "Nothing playing", maxLines = 2, style = TextStyle(color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold))
                     Spacer(GlanceModifier.height(2.dp))
                     Text(data.artist ?: "Tap play for your music", maxLines = 1, style = TextStyle(color = Soft, fontSize = 14.sp))
-                    data.upNext?.let {
+                    data.upNext?.takeIf { roomy }?.let {
                         Spacer(GlanceModifier.height(10.dp))
                         Text("Up next", style = TextStyle(color = Faint, fontSize = 11.sp, fontWeight = FontWeight.Medium))
                         Text(it, maxLines = 1, style = TextStyle(color = Soft, fontSize = 13.sp))
