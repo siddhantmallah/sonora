@@ -74,6 +74,8 @@ data class AppSettings(
     val liveUpdate: Boolean = true,
     /** Mix on the song's own outro, DJ bass swap, skip dead air, keep albums gapless. */
     val smartMix: Boolean = true,
+    /** The line being sung under the title on the now-playing pill (notification, lock screen, Now Bar). */
+    val cardLyrics: Boolean = true,
 )
 
 /** Folders that hold voice notes and call recordings rather than music. Matched as path fragments. */
@@ -116,6 +118,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
         val fontStyle = stringPreferencesKey("font_style")
         val liveUpdate = booleanPreferencesKey("live_update")
         val smartMix = booleanPreferencesKey("smart_mix")
+        val cardLyrics = booleanPreferencesKey("card_lyrics")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -154,6 +157,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
             fontStyle = p[Keys.fontStyle] ?: d.fontStyle,
             liveUpdate = p[Keys.liveUpdate] ?: d.liveUpdate,
             smartMix = p[Keys.smartMix] ?: d.smartMix,
+            cardLyrics = p[Keys.cardLyrics] ?: d.cardLyrics,
         )
     }
 

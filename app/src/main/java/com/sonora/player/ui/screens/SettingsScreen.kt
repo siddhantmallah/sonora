@@ -224,10 +224,11 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
 
         IosGroup(
             "Now playing", largeTitle = true,
-            footer = "The Lyrics and More buttons on the now-playing card (notification, lock screen, Now Bar) show the line being sung, " +
-                "what's up next, the album or picks for you under the title. Always-On: a dim clock, the song and its lyrics on black, drifting so nothing burns in. Pick Sonora as the " +
+            footer = "Lyrics on the pill: the line being sung shows under the song title on your notification, lock screen and Now Bar. " +
+                "Always-On: a dim clock, the song and its lyrics on black, drifting so nothing burns in. Pick Sonora as the " +
                 "screen saver and it shows by itself while your phone charges.",
         ) {
+            row { IosToggleRow("Lyrics on the now-playing pill", L.drawable.lucide_ic_mic_vocal, IosColors.Pink, s.cardLyrics, subtitle = "The sung line under the title") { set.set(Keys.cardLyrics, it) } }
             row { IosRow("Always-On screen", L.drawable.lucide_ic_clock, IosColors.Purple, subtitle = "Open it now") { com.sonora.player.ui.aod.AlwaysOnActivity.open(context) } }
             row {
                 IosRow("Use as screen saver", L.drawable.lucide_ic_moon, IosColors.Blue, subtitle = "Display → Screen saver → Sonora") {

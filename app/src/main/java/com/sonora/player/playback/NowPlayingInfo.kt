@@ -3,7 +3,6 @@ package com.sonora.player.playback
 import android.app.NotificationManager
 import android.app.Service
 import androidx.annotation.OptIn
-import androidx.media3.common.C
 import androidx.media3.common.ForwardingSimpleBasePlayer
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -44,131 +43,58 @@ class InfoPlayer(player: Player) : ForwardingSimpleBasePlayer(player) {
 }
 
 /**
- * The two buttons on the now-playing card: **Lyrics** (the line under the title follows the song) and **More**
- * (cycles Up next → Album → For you → back to the artist). Nothing is shown until you ask for it.
+ * Lyrics on the now-playing pill (notification, lock screen, Now Bar, car and watch): while a song with synced
+ * lyrics plays, the line under the title is the line being sung. Between lines and for songs without synced lyrics it
+ * shows the artist and the album. Turn it off in Settings > Now playing.
  */
 class NowPlayingInfo(
     private val service: Service,
     private val scope: CoroutineScope,
     private val info: InfoPlayer,
-    private val onModeChanged: () -> Unit,
 ) {
-    enum class Mode { OFF, LYRICS, UP_NEXT, ALBUM, FOR_YOU }
-
     private val c get() = (service.applicationContext as com.sonora.player.SonoraApp).container
-    var mode = Mode.OFF
-        private set
     private var loop: Job? = null
     private var shownKey: String? = null
-
     private var lyricsFor: String? = null
     private var lyrics: Lyrics? = null
-    private var recsFor: String? = null
-    private var recs: List<String> = emptyList()
 
     init {
         // The Live Update pill from 1.4.0 is gone: clear its notification channels.
         val nm = service.getSystemService(NotificationManager::class.java)
         listOf("sonora_playing", "sonora_now_playing", "sonora_live_update").forEach { runCatching { nm.deleteNotificationChannel(it) } }
+        loop = scope.launch {
+            while (isActive) {
+                runCatching { update() }
+                delay(200)
+            }
+        }
     }
-
-    fun toggleLyrics() = set(if (mode == Mode.LYRICS) Mode.OFF else Mode.LYRICS)
-
-    fun cycleMore() = set(
-        when (mode) {
-            Mode.UP_NEXT -> Mode.ALBUM
-            Mode.ALBUM -> Mode.FOR_YOU
-            Mode.FOR_YOU -> Mode.OFF
-            else -> Mode.UP_NEXT
-        },
-    )
 
     fun release() { loop?.cancel() }
 
-    private fun set(m: Mode) {
-        mode = m
-        onModeChanged()
-        shownKey = null
-        if (m == Mode.OFF) {
-            loop?.cancel(); loop = null
-            info.show(null)
-            return
-        }
-        if (loop?.isActive != true) loop = scope.launch {
-            while (isActive) {
-                runCatching { update() }
-                delay(if (mode == Mode.LYRICS) 250 else 1000)
-            }
-        }
-    }
-
     private suspend fun update() {
         val p = info.inner
-        val item = p.currentMediaItem ?: return
+        val item = p.currentMediaItem
+        if (item == null || !c.settings.state.value.cardLyrics) {
+            if (shownKey != null) { shownKey = null; info.show(null) }
+            return
+        }
         val id = item.mediaId
         val meta = item.mediaMetadata
         val artist = meta.artist?.toString().orEmpty()
-        var art: android.net.Uri? = null
-        val line: String = when (mode) {
-            Mode.OFF -> return
-            Mode.LYRICS -> {
-                if (lyricsFor != id) {
-                    lyrics = songFor(id, meta)?.let { runCatching { c.lyrics.load(it) }.getOrNull() }?.takeIf { it.synced }
-                    lyricsFor = id
-                }
-                val l = lyrics
-                if (l == null) "No synced lyrics · $artist"
-                else l.lines.getOrNull(l.indexAt(p.currentPosition))?.text?.takeIf { it.isNotBlank() } ?: "♪"
-            }
-            Mode.UP_NEXT -> {
-                val n = p.nextMediaItemIndex
-                if (n == C.INDEX_UNSET) "Nothing up next"
-                else p.getMediaItemAt(n).mediaMetadata.let { m ->
-                    art = m.artworkUri
-                    "Up next · ${m.title ?: "Unknown"}${m.artist?.let { " — $it" } ?: ""}"
-                }
-            }
-            Mode.ALBUM -> {
-                val local = id.toLongOrNull()?.let { c.library.song(it) }
-                val name = (local?.album ?: meta.albumTitle?.toString())?.takeIf { it.isNotBlank() }
-                if (name == null) "No album info"
-                else listOfNotNull("Album · $name", local?.year?.takeIf { it > 0 }?.toString(),
-                    local?.let { s -> c.library.songs.value.count { it.albumId == s.albumId }.let { n -> "$n songs" } }).joinToString(" · ")
-            }
-            Mode.FOR_YOU -> {
-                if (recsFor != id) { recs = recommendations(p, id); recsFor = id }
-                if (recs.isEmpty()) "No picks for this one yet"
-                else {
-                    // Rotate through the picks every few seconds.
-                    val i = ((System.currentTimeMillis() / 5000) % recs.size).toInt()
-                    "For you · ${recs[i]}"
-                }
-            }
+        val album = meta.albumTitle?.toString()?.takeIf { it.isNotBlank() && it != meta.title?.toString() }
+        if (lyricsFor != id) {
+            lyricsFor = id
+            lyrics = null
+            lyrics = songFor(id, meta)?.let { runCatching { c.lyrics.load(it) }.getOrNull() }?.takeIf { it.synced }
         }
-        val key = "$id|$mode|$line|$art"
+        val l = lyrics
+        val sung = l?.lines?.getOrNull(l.indexAt(p.currentPosition))?.text?.takeIf { it.isNotBlank() }
+        val line = sung ?: listOfNotNull(artist.ifBlank { null }, album).joinToString(" — ")
+        val key = "$id|$line"
         if (key == shownKey) return
         shownKey = key
-        val pic = art
-        info.show { m ->
-            m.buildUpon().setArtist(line).setSubtitle(line).apply {
-                if (pic != null) { setArtworkData(null, null); setArtworkUri(pic) }
-            }.build()
-        }
-    }
-
-    /** Songs like this one that aren't queued: YouTube's song radio, or your own songs by the same artist / genre. */
-    private suspend fun recommendations(p: Player, mediaId: String): List<String> {
-        val queued = (0 until p.mediaItemCount).map { p.getMediaItemAt(it).mediaId }.toSet()
-        YtIds.videoId(mediaId)?.let { v ->
-            return runCatching { c.youtube.radio(v) }.getOrDefault(emptyList())
-                .filter { it.mediaId !in queued }.take(4)
-                .map { s -> listOfNotNull(s.title, s.artists.firstOrNull()?.name).joinToString(" — ") }
-        }
-        val local = mediaId.toLongOrNull()?.let { c.library.song(it) } ?: return emptyList()
-        val all = c.library.songs.value.filter { it.id.toString() !in queued }
-        val same = all.filter { it.primaryArtist.equals(local.primaryArtist, true) }.shuffled()
-        val genre = local.genre?.let { g -> all.filter { it.genre == g && it !in same }.shuffled() }.orEmpty()
-        return (same + genre).take(4).map { "${it.title} — ${it.artist}" }
+        info.show { m -> m.buildUpon().setArtist(line).setSubtitle(line).build() }
     }
 
     private fun songFor(mediaId: String, meta: MediaMetadata): Song? {
@@ -182,4 +108,3 @@ class NowPlayingInfo(
         )
     }
 }
-

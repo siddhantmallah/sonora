@@ -37,7 +37,7 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 - Your local library (songs, albums, artists, playlists, genres, folders) with instant accent-insensitive search
 - YouTube Music: search, browse, your feed, likes and playlists when signed in, radio-style autoplay, downloads
 - Gapless playback, sleep timer with fade-out, speed and pitch, skip silence
-- **Smart mix**: songs really overlap (a second deck plays the outro while the next song starts). It starts on the song's own fade-out, swaps the bass halfway like a DJ so two beats never pile up, skips dead air at the end, and keeps albums gapless
+- **Smart mix**: songs really overlap. A second deck locks onto the playing song within a few milliseconds and plays its outro while the next song starts, through the same EQ and effects. The new song rises as the old one falls away, the bass swaps halfway like a DJ, loud songs are levelled, dead air at the end is skipped and albums stay gapless
 - Background play, notification and lock-screen controls, Android Auto, Wear OS, home-screen widgets
 
 **Cast to any TV**
@@ -69,7 +69,7 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 - Scroll down and the mini player melts into the tab bar as one compact glass row; scroll up for the full dock
 
 **Beyond the app**
-- **Now-playing card buttons**: on the notification, lock screen and Now Bar, *Lyrics* puts the line being sung under the title, and *More* cycles up next (with its cover), the album and picks for you
+- **Lyrics on the now-playing pill**: on the notification, lock screen and Now Bar, the line being sung shows next to the song title (artist and album between lines)
 - **Long-press the app icon**: Lyrics, Up next, Search, Liked songs, Always-On, Shuffle all
 - **Always-On screen**: a dim clock, the song and its lyrics on pure black, drifting so nothing burns in. Open it from the player, or pick Sonora as the screen saver to have it show while charging
 

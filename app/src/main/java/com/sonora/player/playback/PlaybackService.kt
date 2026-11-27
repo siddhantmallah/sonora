@@ -233,7 +233,7 @@ class PlaybackService : MediaLibraryService() {
         // What the system's now-playing card sees: Sonora's player, plus the Lyrics / More line when you ask for it.
         val sessionPlayer = InfoPlayer(castPlayer ?: player)
         castHub.sessionPlayer = sessionPlayer
-        nowInfo = NowPlayingInfo(this, scope, sessionPlayer) { session.setMediaButtonPreferences(buttons(currentFavorite)) }
+        nowInfo = NowPlayingInfo(this, scope, sessionPlayer)
 
         session = MediaLibrarySession.Builder(this, sessionPlayer, LibraryCallback())
             .setSessionActivity(openApp)
@@ -342,6 +342,8 @@ class PlaybackService : MediaLibraryService() {
             )
             .setMediaSourceFactory(DefaultMediaSourceFactory(buildDataSourceFactory()))
             .build()
+        // Same audio session as the main player, so the equalizer and effects shape both decks the same way.
+        deck.setAudioSessionId(player.audioSessionId)
         deck.playbackParameters = player.playbackParameters
         return deck to eq
     }
@@ -607,18 +609,6 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun buttons(favorite: Boolean): List<CommandButton> = listOf(
-        // Lyrics: the line under the title follows the song.
-        CommandButton.Builder(if (nowInfo.mode == NowPlayingInfo.Mode.LYRICS) CommandButton.ICON_SUBTITLES_OFF else CommandButton.ICON_SUBTITLES)
-            .setDisplayName(if (nowInfo.mode == NowPlayingInfo.Mode.LYRICS) "Hide lyrics" else "Show lyrics")
-            .setSessionCommand(SessionCommand(Commands.LYRICS, Bundle.EMPTY))
-            .build(),
-        // More: up next (with its cover) → album → picks for you → back to the artist.
-        when (nowInfo.mode) {
-            NowPlayingInfo.Mode.UP_NEXT -> CommandButton.Builder(CommandButton.ICON_ALBUM).setDisplayName("Show the album")
-            NowPlayingInfo.Mode.ALBUM -> CommandButton.Builder(CommandButton.ICON_RADIO).setDisplayName("Show picks for you")
-            NowPlayingInfo.Mode.FOR_YOU -> CommandButton.Builder(CommandButton.ICON_ARTIST).setDisplayName("Back to the artist")
-            else -> CommandButton.Builder(CommandButton.ICON_QUEUE_NEXT).setDisplayName("Show up next")
-        }.setSessionCommand(SessionCommand(Commands.MORE, Bundle.EMPTY)).build(),
         CommandButton.Builder(if (favorite) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
             .setDisplayName(if (favorite) "Remove from favorites" else "Add to favorites")
             .setSessionCommand(favoriteCommand)
@@ -734,8 +724,6 @@ class PlaybackService : MediaLibraryService() {
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                 .add(sleepCommand)
                 .add(favoriteCommand)
-                .add(SessionCommand(Commands.LYRICS, Bundle.EMPTY))
-                .add(SessionCommand(Commands.MORE, Bundle.EMPTY))
                 .add(SessionCommand(Commands.SET_OUTPUT, Bundle.EMPTY))
                 .add(SessionCommand(Commands.CAST_DLNA, Bundle.EMPTY))
                 .add(SessionCommand(Commands.STOP_CAST, Bundle.EMPTY))
@@ -757,8 +745,6 @@ class PlaybackService : MediaLibraryService() {
             args: Bundle,
         ): ListenableFuture<SessionResult> {
             when (customCommand.customAction) {
-                Commands.LYRICS -> nowInfo.toggleLyrics()
-                Commands.MORE -> nowInfo.cycleMore()
                 Commands.SLEEP_TIMER -> setSleepTimer(
                     args.getInt(Commands.ARG_MINUTES, 0),
                     args.getBoolean(Commands.ARG_END_OF_TRACK, false),
