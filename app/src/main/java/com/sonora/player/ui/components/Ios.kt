@@ -140,7 +140,7 @@ fun IosToggleRow(title: String, @DrawableRes icon: Int, color: Color, checked: B
             Switch(
                 checked = checked, onCheckedChange = onChange,
                 colors = SwitchDefaults.colors(
-                    checkedTrackColor = MaterialTheme.colorScheme.primary, checkedThumbColor = Color.White,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer, checkedThumbColor = Color.Black,
                     uncheckedThumbColor = Color.White, uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     uncheckedBorderColor = Color.Transparent,
                 ),

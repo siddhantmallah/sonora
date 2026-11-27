@@ -182,9 +182,9 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
                             Text(
                                 label,
                                 style = MaterialTheme.typography.labelLarge.copy(fontFamily = fam),
-                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
-                                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest)
+                                    .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest)
                                     .clickable { set.set(Keys.fontStyle, key) }
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                             )

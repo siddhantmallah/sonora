@@ -21,6 +21,10 @@ import com.sonora.player.data.ThemeMode
 
 /** Sonora brand colours. */
 object Brand {
+    /** Sonora's accent: an electric volt yellow. Black text and icons sit on it. */
+    val Volt = Color(0xFFEFFF1A)
+    /** The same hue, deep enough to read as text on white. */
+    val VoltInk = Color(0xFF5A6400)
     val Pink = Color(0xFFFF2D6F)
     val Coral = Color(0xFFFF5A5F)
     val Violet = Color(0xFF7C4DFF)
@@ -44,10 +48,10 @@ object Brand {
 
 /** Sonora's dark palette; also used for glass sheets on the player. */
 val DarkScheme = darkColorScheme(
-    primary = Brand.Pink,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF3A0F22),
-    onPrimaryContainer = Color(0xFFFFD9E3),
+    primary = Brand.Volt,
+    onPrimary = Color.Black,
+    primaryContainer = Brand.Volt,
+    onPrimaryContainer = Color.Black,
     secondary = Brand.Violet,
     onSecondary = Color.White,
     secondaryContainer = Color(0xFF2A1F4D),
@@ -68,10 +72,10 @@ val DarkScheme = darkColorScheme(
 )
 
 private val LightScheme = lightColorScheme(
-    primary = Color(0xFFE8195B),
+    primary = Brand.VoltInk,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFD9E3),
-    onPrimaryContainer = Color(0xFF3E0018),
+    primaryContainer = Brand.Volt,
+    onPrimaryContainer = Color.Black,
     secondary = Brand.Violet,
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFE9E1FF),

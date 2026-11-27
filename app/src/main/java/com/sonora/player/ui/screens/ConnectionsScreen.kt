@@ -145,7 +145,7 @@ fun ConnectionsScreen(vm: MainViewModel, actions: UiActions) {
                         repeat(2) { i ->
                             Box(
                                 Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp))
-                                    .background(if (i < total) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest),
+                                    .background(if (i < total) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest),
                             )
                         }
                     }

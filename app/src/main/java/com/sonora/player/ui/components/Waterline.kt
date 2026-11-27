@@ -79,8 +79,13 @@ fun WaterlineTabs(
     val water = remember { WaterSim() }
     var size by remember { mutableStateOf(Size.Zero) }
     var frame by remember { mutableLongStateOf(0L) }
-    val accent = MaterialTheme.colorScheme.primary
+    // The drop is volt liquid; the icon sitting in it is black.
+    val accent = MaterialTheme.colorScheme.primaryContainer
+    val onAccent = MaterialTheme.colorScheme.onPrimaryContainer
     val scope = rememberCoroutineScope()
+    // Real liquid on Android 13+: a GPU shader (metaball body, light, ripples, caustics). Older phones draw shapes.
+    val shader = remember { if (android.os.Build.VERSION.SDK_INT >= 33) LiquidShader() else null }
+    val clock = remember { floatArrayOf(0f) }
     val fx = remember(tabs.size) { List(tabs.size) { Animatable(1f) } }
 
     // Geometry from the bar size: one cell per tab, the drop a little inside the cell.
@@ -99,6 +104,7 @@ fun WaterlineTabs(
                 val dt = if (last == 0L) 1f / 60f else ((now - last) / 1e9f).coerceIn(0f, 1f / 30f)
                 last = now
                 water.step(dt)
+                clock[0] += dt
                 frame++
             }
         }
@@ -108,12 +114,15 @@ fun WaterlineTabs(
     Box(modifier.onSizeChanged { size = Size(it.width.toFloat(), it.height.toFloat()) }) {
         Canvas(Modifier.fillMaxSize()) {
             @Suppress("UNUSED_EXPRESSION") frame
-            water.draw(this, dark, accent)
+            val sh = shader
+            if (sh != null && android.os.Build.VERSION.SDK_INT >= 33) sh.draw(this, water, accent, dark, clock[0])
+            else water.draw(this, dark, accent)
         }
         Row(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
             tabs.forEachIndexed { i, tab ->
                 val isSel = i == selected
-                val tint = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                // Unselected tabs sit on clear glass over busy pages, so they get a stronger tone than usual.
+                val tint = if (isSel) onAccent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
                 val p = fx[i].value
                 Column(
                     Modifier.weight(1f).fillMaxHeight().clickable(
@@ -122,7 +131,7 @@ fun WaterlineTabs(
                         if (i != selected) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         water.ripple(centerOf(i), size.height / 2, if (i == selected) 0.6f else 0.9f)
                         scope.launch { fx[i].snapTo(0f); fx[i].animateTo(1f, tween(if (tab.fx == TabFx.SPIN) 700 else 650, easing = LinearEasing)) }
-                        scope.launch { kickRipples(water) { frame++ } }
+                        scope.launch { kickRipples(water) { dt -> clock[0] += dt; frame++ } }
                         onSelect(i)
                     },
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -167,14 +176,14 @@ fun WaterlineTabs(
 }
 
 /** Keeps frames coming while a tap's ripple fades (when the drop itself isn't moving). */
-private suspend fun kickRipples(water: WaterSim, onFrame: () -> Unit) {
+private suspend fun kickRipples(water: WaterSim, onFrame: (Float) -> Unit) {
     var last = 0L
     while (water.ripplesActive()) {
         withFrameNanos { now ->
             val dt = if (last == 0L) 1f / 60f else ((now - last) / 1e9f).coerceIn(0f, 1f / 30f)
             last = now
             water.stepRipples(dt)
-            onFrame()
+            onFrame(dt)
         }
     }
 }
@@ -220,6 +229,24 @@ private class WaterSim {
             split = false
         }
         tx = x
+    }
+
+    /**
+     * Packs the water for the shader, in dp: blobs as (x, y, half-length, radius), their vertical squash, and
+     * ripples as (x, y, age s, strength).
+     */
+    fun pack(scale: Float, blob: FloatArray, sq: FloatArray, rip: FloatArray) {
+        blob.fill(0f); sq.fill(1f); rip.fill(0f)
+        if (!ready) return
+        val sep = abs(a.x - b.x)
+        val thin = min(sep / (2 * (q + r)).coerceAtLeast(1f), 1f)
+        val head = if (lead == 0) a else b
+        val tail = if (lead == 0) b else a
+        fun put(i: Int, x: Float, y: Float, half: Float, rad: Float) { blob[i * 4] = x / scale; blob[i * 4 + 1] = y / scale; blob[i * 4 + 2] = half / scale; blob[i * 4 + 3] = rad / scale }
+        put(0, head.x, cy, q * (1f - 0.25f * thin), r * (1f - 0.12f * thin)); sq[0] = sy
+        put(1, tail.x, cy, q * (1f - 0.8f * thin), r * (1f - 0.5f * thin)); sq[1] = sy
+        drops.take(4).forEachIndexed { i, d -> put(2 + i, d.x, d.y, 0f, d.r) }
+        ripples.takeLast(6).forEachIndexed { i, rp -> rip[i * 4] = rp.x / scale; rip[i * 4 + 1] = rp.y / scale; rip[i * 4 + 2] = rp.age; rip[i * 4 + 3] = rp.amp }
     }
 
     fun busy() = moving || drops.isNotEmpty() || ripples.isNotEmpty() || abs(sy - 1f) > 0.002f || abs(a.x - tx) > 0.3f || abs(b.x - tx) > 0.3f
@@ -351,3 +378,117 @@ private class WaterSim {
         }
     }
 }
+
+/**
+ * The drop as liquid, on the GPU: blobs melt into each other (smooth-min of capsule distances), the surface is shaded
+ * from its own height field (thick in the middle, thin at the rim), lit by two lights with a sharp specular glint, a
+ * faint rainbow fresnel edge and moving caustics inside; taps and landings send waves across it. Ported from the
+ * WebGL shader of the "liquid glass navbar" (Nimbus UI · Waterline) to Android's AGSL.
+ */
+@androidx.annotation.RequiresApi(33)
+private class LiquidShader {
+    private val shader = android.graphics.RuntimeShader(LIQUID_AGSL)
+    private val brush = androidx.compose.ui.graphics.ShaderBrush(shader)
+    private val blob = FloatArray(24)
+    private val sq = FloatArray(6)
+    private val rip = FloatArray(24)
+
+    fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope, water: WaterSim, tint: Color, dark: Boolean, time: Float) = with(scope) {
+        water.pack(density, blob, sq, rip)
+        shader.setFloatUniform("uScale", density)
+        shader.setFloatUniform("uTime", time)
+        shader.setFloatUniform("uBlob", blob)
+        shader.setFloatUniform("uSy", sq)
+        shader.setFloatUniform("uRip", rip)
+        shader.setFloatUniform("uTint", tint.red, tint.green, tint.blue)
+        shader.setFloatUniform("uDark", if (dark) 1f else 0f)
+        drawRect(brush)
+    }
+}
+
+private const val LIQUID_AGSL = """
+uniform float uScale;
+uniform float uTime;
+uniform float4 uBlob[6];
+uniform float uSy[6];
+uniform float4 uRip[6];
+uniform float3 uTint;
+uniform float uDark;
+
+float sdCap(float2 p, float4 B, float sy) {
+    p -= B.xy; p.y /= sy; p.x = max(abs(p.x) - B.z, 0.0);
+    return (length(p) - B.w) * min(1.0, sy);
+}
+float smin(float a, float b, float k) {
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+float dropD(float2 p) {
+    float d = 10000.0;
+    for (int i = 0; i < 6; i++) {
+        if (uBlob[i].w > 0.5) d = smin(d, sdCap(p, uBlob[i], uSy[i]), 13.0);
+    }
+    return d;
+}
+float lens(float d, float w) { float t = clamp(-d / w, 0.0, 1.0); return sqrt(1.0 - (1.0 - t) * (1.0 - t)); }
+float waves(float2 p) {
+    float w = 0.0;
+    for (int i = 0; i < 6; i++) {
+        float4 R = uRip[i];
+        if (R.w > 0.0) {
+            float x = length(p - R.xy) - R.z * 120.0;
+            w += R.w * exp(-R.z * 2.0) * sin(x * 0.45) * exp(-x * x / 500.0);
+        }
+    }
+    return w;
+}
+float H(float2 p) {
+    float dd = dropD(p);
+    return lens(dd, 11.0) * 7.5 + waves(p) * smoothstep(1.0, -4.0, dd);
+}
+float caus(float2 p, float t) {
+    float2 q = p; float c = 0.0;
+    for (int i = 0; i < 3; i++) {
+        q += float2(sin(q.y * 1.1 + t), cos(q.x * 1.3 - t * 0.7)) * 0.6;
+        c += 1.0 / (1.0 + 16.0 * abs(sin(q.x) * sin(q.y)));
+    }
+    return c / 3.0;
+}
+
+half4 main(float2 fc) {
+    float2 p = fc / uScale;
+    float dd = dropD(p);
+    // Soft shadow the drop casts on the glass below it.
+    float shadow = smoothstep(9.0, -9.0, dropD(p - float2(0.0, 3.5))) * (0.10 + 0.12 * uDark);
+    if (dd > 10.0) return half4(0.0, 0.0, 0.0, half(shadow * 0.6));
+    float inside = clamp(-dd * uScale + 0.5, 0.0, 1.0);
+
+    float h0 = H(p);
+    float3 n = normalize(float3(h0 - H(p + float2(0.6, 0.0)), h0 - H(p + float2(0.0, 0.6)), 0.6));
+    float th = lens(dd, 11.0);
+    float body = 0.5 + 0.5 * clamp(-n.y * 3.0, -1.0, 1.0);
+
+    // Liquid colour: lit from above, deeper and richer toward the thin rim.
+    float3 col = uTint * (0.84 + 0.22 * body);
+    float rim = 1.0 - smoothstep(0.0, 6.0, -dd);
+    col = mix(col, uTint * float3(0.62, 0.64, 0.30), rim * 0.55);
+    // Caustics: light focused through the liquid, drifting.
+    float cs = caus((p + n.xy * th * 18.0) * 0.085, uTime * 0.9);
+    col += float3(1.0, 1.0, 0.85) * smoothstep(0.62, 1.0, cs) * 0.22 * th;
+    // Light passing through, gathering along the lower edge.
+    float cres = smoothstep(0.12, 0.55, dot(n.xy, normalize(float2(0.55, 0.85)))) * smoothstep(0.0, 3.0, -dd);
+    col = mix(col, float3(1.0, 1.0, 0.92), cres * 0.35);
+    // Specular glints from two lights.
+    float spec = pow(max(dot(reflect(-normalize(float3(-0.45, -0.8, 0.85)), n), float3(0.0, 0.0, 1.0)), 0.0), 70.0);
+    float spec2 = pow(max(dot(reflect(-normalize(float3(0.6, 0.75, 0.7)), n), float3(0.0, 0.0, 1.0)), 0.0), 22.0) * 0.3;
+    col = mix(col, float3(1.0), clamp(spec * 1.25 + spec2 * 0.5, 0.0, 1.0));
+    // A faint rainbow at the very edge (fresnel).
+    float fres = clamp((1.0 - n.z) * 4.0, 0.0, 1.0);
+    float3 irid = 0.5 + 0.5 * cos(6.2831 * (float3(0.0, 0.33, 0.67) + fres * 0.85 + p.x * 0.0028 + uTime * 0.035));
+    col = mix(col, mix(float3(1.0), irid, 0.35), smoothstep(-2.5, 0.0, dd) * 0.35);
+
+    float a = inside * 0.97;
+    float outA = a + shadow * (1.0 - a);
+    return half4(half3(col * a), half(outA));
+}
+"""

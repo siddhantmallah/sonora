@@ -389,8 +389,9 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
     val glass = remember(bg) {
         dev.chrisbanes.haze.blur.HazeBlurStyle {
             backgroundColor(bg)
-            colorEffects(listOf(dev.chrisbanes.haze.blur.HazeColorEffect.tint(bg.copy(alpha = 0.55f))))
-            blurRadius(30.dp)
+            // Clear glass: a light tint, so the page behind shows through (blurred) instead of a frosted slab.
+            colorEffects(listOf(dev.chrisbanes.haze.blur.HazeColorEffect.tint(bg.copy(alpha = 0.40f))))
+            blurRadius(22.dp)
             noiseFactor(0.05f)
         }
     }
