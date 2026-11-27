@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the Sonora icon. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="lyrics"
+        android:enabled="true"
+        android:icon="@drawable/sc_lyrics"
+        android:shortcutShortLabel="@string/sc_lyrics"
+        android:shortcutLongLabel="@string/sc_lyrics_long">
+        <intent
+            android:action="com.sonora.player.SHORTCUT"
+            android:targetPackage="com.sonora.player"
+            android:targetClass="com.sonora.player.ui.MainActivity">
+            <extra android:name="target" android:value="lyrics" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="queue"
+        android:enabled="true"
+        android:icon="@drawable/sc_queue"
+        android:shortcutShortLabel="@string/sc_queue"
+        android:shortcutLongLabel="@string/sc_queue_long">
+        <intent
+            android:action="com.sonora.player.SHORTCUT"
+            android:targetPackage="com.sonora.player"
+            android:targetClass="com.sonora.player.ui.MainActivity">
+            <extra android:name="target" android:value="queue" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="search"
+        android:enabled="true"
+        android:icon="@drawable/sc_search"
+        android:shortcutShortLabel="@string/sc_search"
+        android:shortcutLongLabel="@string/sc_search_long">
+        <intent
+            android:action="com.sonora.player.SHORTCUT"
+            android:targetPackage="com.sonora.player"
+            android:targetClass="com.sonora.player.ui.MainActivity">
+            <extra android:name="target" android:value="search" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="liked"
+        android:enabled="true"
+        android:icon="@drawable/sc_liked"
+        android:shortcutShortLabel="@string/sc_liked"
+        android:shortcutLongLabel="@string/sc_liked_long">
+        <intent
+            android:action="com.sonora.player.SHORTCUT"
+            android:targetPackage="com.sonora.player"
+            android:targetClass="com.sonora.player.ui.MainActivity">
+            <extra android:name="target" android:value="liked" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="aod"
+        android:enabled="true"
+        android:icon="@drawable/sc_aod"
+        android:shortcutShortLabel="@string/sc_aod"
+        android:shortcutLongLabel="@string/sc_aod_long">
+        <intent
+            android:action="com.sonora.player.SHORTCUT"
+            android:targetPackage="com.sonora.player"
+            android:targetClass="com.sonora.player.ui.MainActivity">
+            <extra android:name="target" android:value="aod" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="shuffle"
+        android:enabled="true"
+        android:icon="@drawable/sc_shuffle"
+        android:shortcutShortLabel="@string/sc_shuffle"
+        android:shortcutLongLabel="@string/sc_shuffle_long">
+        <intent
+            android:action="com.sonora.player.SHORTCUT"
+            android:targetPackage="com.sonora.player"
+            android:targetClass="com.sonora.player.ui.MainActivity">
+            <extra android:name="target" android:value="shuffle" />
+        </intent>
+    </shortcut>
+</shortcuts>

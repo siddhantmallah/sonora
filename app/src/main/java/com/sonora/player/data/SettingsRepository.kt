@@ -56,7 +56,7 @@ data class AppSettings(
     val ytDataSaverWifi: Boolean = false,
     val ytAutoplay: Boolean = true,
     // Playback extras
-    val crossfadeSec: Int = 0,
+    val crossfadeSec: Int = 6,
     val listenBrainzToken: String = "",
     // Sonora's own audio stage (see playback/SonoraDsp.kt)
     /** 0 = off, 1 = auto (lossy sources only), 2 = always. */
@@ -72,6 +72,8 @@ data class AppSettings(
     val fontStyle: String = "system",
     /** Android 16 Live Update: the playing song as a chip by the camera. */
     val liveUpdate: Boolean = true,
+    /** Mix on the song's own outro, DJ bass swap, skip dead air, keep albums gapless. */
+    val smartMix: Boolean = true,
 )
 
 /** Folders that hold voice notes and call recordings rather than music. Matched as path fragments. */
@@ -113,6 +115,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
         val monoAudio = booleanPreferencesKey("mono_audio")
         val fontStyle = stringPreferencesKey("font_style")
         val liveUpdate = booleanPreferencesKey("live_update")
+        val smartMix = booleanPreferencesKey("smart_mix")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -150,6 +153,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
             monoAudio = p[Keys.monoAudio] ?: d.monoAudio,
             fontStyle = p[Keys.fontStyle] ?: d.fontStyle,
             liveUpdate = p[Keys.liveUpdate] ?: d.liveUpdate,
+            smartMix = p[Keys.smartMix] ?: d.smartMix,
         )
     }
 

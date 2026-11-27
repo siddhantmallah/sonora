@@ -197,7 +197,11 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
             }
         }
 
-        IosGroup("Playback", largeTitle = true, footer = "Crossfade fades each song out and the next one in, so there are no hard cuts.") {
+        IosGroup(
+            "Playback", largeTitle = true,
+            footer = "Mix overlaps the end of each song with the start of the next. Smart mix listens to the music: it starts on the song's own fade-out, " +
+                "swaps the bass halfway like a DJ so two beats never pile up, skips dead air at the end, and keeps albums gapless.",
+        ) {
             row { IosRow("Equalizer & effects", L.drawable.lucide_ic_sliders_horizontal, IosColors.Blue, detail = if (s.eqEnabled) "On" else "Off") { actions.equalizer() } }
             row { IosRow("Driving mode", L.drawable.lucide_ic_car, IosColors.Gray, subtitle = "Big controls, voice and Map mode") { actions.drive() } }
             row {
@@ -206,7 +210,7 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconSquare(L.drawable.lucide_ic_blend, IosColors.Purple)
                         Spacer(Modifier.width(14.dp))
-                        Text("Crossfade", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text("Mix length", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Text(if (local < 0.5f) "Off" else "${local.toInt()} s", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     ThinSlider(local.toInt(), 0..12, Modifier.padding(vertical = 6.dp), onChange = { local = it.toFloat() }) {
@@ -214,17 +218,16 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
                     }
                 }
             }
+            row { IosToggleRow("Smart mix", L.drawable.lucide_ic_sparkles, IosColors.Pink, s.smartMix, subtitle = "Mixes like a DJ: on the outro, with a bass swap") { set.set(Keys.smartMix, it) } }
             row { IosToggleRow("Skip silence", L.drawable.lucide_ic_scissors, IosColors.Gray, s.skipSilence) { set.set(Keys.skipSilence, it) } }
         }
 
         IosGroup(
             "Now playing", largeTitle = true,
-            footer = "Always-On: a dim clock, the song and its lyrics on black, drifting so nothing burns in. Pick Sonora as the " +
+            footer = "The Lyrics and More buttons on the now-playing card (notification, lock screen, Now Bar) show the line being sung, " +
+                "what's up next, the album or picks for you under the title. Always-On: a dim clock, the song and its lyrics on black, drifting so nothing burns in. Pick Sonora as the " +
                 "screen saver and it shows by itself while your phone charges.",
         ) {
-            if (Build.VERSION.SDK_INT >= 36) {
-                row { IosToggleRow("Live Update by the camera", L.drawable.lucide_ic_smartphone, IosColors.Green, s.liveUpdate, subtitle = "Time left in the status bar; pull down for up next, album and lyrics") { set.set(Keys.liveUpdate, it) } }
-            }
             row { IosRow("Always-On screen", L.drawable.lucide_ic_clock, IosColors.Purple, subtitle = "Open it now") { com.sonora.player.ui.aod.AlwaysOnActivity.open(context) } }
             row {
                 IosRow("Use as screen saver", L.drawable.lucide_ic_moon, IosColors.Blue, subtitle = "Display → Screen saver → Sonora") {
@@ -236,7 +239,7 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
         IosGroup("Audio quality", largeTitle = true) {
             row { IosToggleRow("Hi-Res output", L.drawable.lucide_ic_audio_waveform, IosColors.Orange, s.hiResOutput, subtitle = "32-bit float keeps 24-bit / 96 kHz+ intact") { set.set(Keys.hiResOutput, it) } }
             if (Build.VERSION.SDK_INT >= 34) {
-                row { IosToggleRow("Bit-perfect USB DAC", L.drawable.lucide_ic_usb, IosColors.Teal, s.bitPerfectUsb, subtitle = "No Android resampling or mixing") { set.set(Keys.bitPerfectUsb, it) } }
+                row { IosToggleRow("Bit-perfect USB DAC", L.drawable.lucide_ic_usb, IosColors.Teal, s.bitPerfectUsb, subtitle = "While a USB DAC is plugged in: no resampling, no effects") { set.set(Keys.bitPerfectUsb, it) } }
             }
             row { IosToggleRow("Battery saver", L.drawable.lucide_ic_battery_charging, IosColors.Green, s.audioOffload, subtitle = "Audio offload · disables EQ and visualizer") { set.set(Keys.audioOffload, it) } }
         }

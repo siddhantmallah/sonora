@@ -36,7 +36,8 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 **Play anything**
 - Your local library (songs, albums, artists, playlists, genres, folders) with instant accent-insensitive search
 - YouTube Music: search, browse, your feed, likes and playlists when signed in, radio-style autoplay, downloads
-- Gapless playback, crossfade, sleep timer with fade-out, speed and pitch, skip silence
+- Gapless playback, sleep timer with fade-out, speed and pitch, skip silence
+- **Smart mix**: songs really overlap (a second deck plays the outro while the next song starts). It starts on the song's own fade-out, swaps the bass halfway like a DJ so two beats never pile up, skips dead air at the end, and keeps albums gapless
 - Background play, notification and lock-screen controls, Android Auto, Wear OS, home-screen widgets
 
 **Cast to any TV**
@@ -47,7 +48,7 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 
 **Sound**
 - **Sonora Enhance**: lossy audio (streams, MP3, AAC, Opus) loses its top end. Enhance regenerates the highs the codec cut off, adds a touch of warmth and width, and has a soft limiter so nothing clips. *Auto* runs only on lossy sources. (It can't turn a 128 kbps stream into true 320 kbps, since that detail is gone, but it brings back much of the feel.)
-- **For audiophiles**: Hi-Res 32-bit float output (24-bit / 96–192 kHz untouched), bit-perfect USB DAC mode, pre-amp headroom, balance, mono
+- **For audiophiles**: Hi-Res 32-bit float output (24-bit / 96–192 kHz untouched), bit-perfect USB DAC mode (only while a DAC is plugged in), pre-amp headroom, balance, mono
 - Equalizer, bass boost, virtualizer and loudness; real codec / sample-rate / bitrate shown for every track
 - Bluetooth codec readout (LDAC, aptX HD, AAC…) where Android allows it
 
@@ -68,7 +69,8 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 - Scroll down and the mini player melts into the tab bar as one compact glass row; scroll up for the full dock
 
 **Beyond the app**
-- **Live Update** (Android 16): the song's time left as a chip by the camera; pull it down for up next, the album, the line being sung, and previous / play / next
+- **Now-playing card buttons**: on the notification, lock screen and Now Bar, *Lyrics* puts the line being sung under the title, and *More* cycles up next (with its cover), the album and picks for you
+- **Long-press the app icon**: Lyrics, Up next, Search, Liked songs, Always-On, Shuffle all
 - **Always-On screen**: a dim clock, the song and its lyrics on pure black, drifting so nothing burns in. Open it from the player, or pick Sonora as the screen saver to have it show while charging
 
 **Home**

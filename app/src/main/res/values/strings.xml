@@ -6,4 +6,16 @@
     <string name="widget_cover_name">Sonora cover</string>
     <string name="widget_cover_desc">Album artwork with a play button.</string>
     <string name="downloads_channel">Downloads</string>
+    <string name="sc_lyrics">Lyrics</string>
+    <string name="sc_lyrics_long">Lyrics of the song playing</string>
+    <string name="sc_queue">Up next</string>
+    <string name="sc_queue_long">Up next in the queue</string>
+    <string name="sc_search">Search</string>
+    <string name="sc_search_long">Search songs and YouTube Music</string>
+    <string name="sc_liked">Liked songs</string>
+    <string name="sc_liked_long">Liked songs</string>
+    <string name="sc_aod">Always-On</string>
+    <string name="sc_aod_long">Always-On screen</string>
+    <string name="sc_shuffle">Shuffle all</string>
+    <string name="sc_shuffle_long">Shuffle all your songs</string>
 </resources>

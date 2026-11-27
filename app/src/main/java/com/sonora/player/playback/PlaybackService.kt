@@ -89,7 +89,7 @@ class PlaybackService : MediaLibraryService() {
     private var extras = Bundle()
     private var source: SourceFormat? = null
     private var currentFavorite = false
-    private val liveUpdate by lazy { LiveUpdate(this, scope) }
+    private lateinit var nowInfo: NowPlayingInfo
 
     private val sleepCommand = SessionCommand(Commands.SLEEP_TIMER, Bundle.EMPTY)
     private val favoriteCommand = SessionCommand(Commands.TOGGLE_FAVORITE, Bundle.EMPTY)
@@ -101,22 +101,16 @@ class PlaybackService : MediaLibraryService() {
         val tap = c.audioTap
         c.dsp.apply(settings)
         scope.launch { c.settings.state.collect { c.dsp.apply(it) } }
-        val renderers = object : DefaultRenderersFactory(this) {
-            override fun buildAudioSink(
-                context: Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean,
-            ): AudioSink = DefaultAudioSink.Builder(context)
-                .setEnableFloatOutput(enableFloatOutput)
-                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                // Sonora's audio stage first (Enhance, pre-amp, balance, mono; a plain copy when all off), then
-                // the tap that feeds the visualizer, so it shows what you actually hear.
-                .setAudioProcessors(arrayOf(DspProcessor(c.dsp), TapProcessor(tap)))
-                .build()
+        // Bit-perfect only switches Sonora's processing off while a USB DAC is actually the output.
+        scope.launch {
+            c.output.state.collect {
+                c.dsp.usbOutput = it.type == OutputType.USB
+                c.dsp.apply(c.settings.state.value)
+            }
         }
-            // 32-bit float PCM keeps 24-bit / hi-res sources intact instead of truncating to 16-bit.
-            .setEnableAudioFloatOutput(settings.hiResOutput)
-            .setEnableDecoderFallback(true)
+        // Sonora's audio stage first (Enhance, pre-amp, balance, mono; a plain copy when all off), then the tap that
+        // feeds the visualizer (so it shows what you actually hear), then the mixer's bass knob.
+        val renderers = renderers(settings.hiResOutput) { arrayOf(DspProcessor(c.dsp), TapProcessor(tap), MixEqProcessor(mainMix)) }
 
         player = ExoPlayer.Builder(this, renderers)
             .setAudioAttributes(
@@ -179,10 +173,24 @@ class PlaybackService : MediaLibraryService() {
             }
         })
         c.effects.attach(player.audioSessionId)
+        mixer = SmartMixer(
+            player, mainMix, tap, c.library,
+            settings = { c.settings.state.value },
+            blocked = {
+                sleepJob?.isActive == true || com.sonora.player.cast.CastState.target.value != null ||
+                    (c.settings.state.value.bitPerfectUsb && c.dsp.usbOutput)
+            },
+            makeDeck = ::makeDeck,
+        )
+        mixer.start(scope)
 
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 onTrackChanged(mediaItem)
+            }
+
+            override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) mixer.onUserSeek()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -222,14 +230,15 @@ class PlaybackService : MediaLibraryService() {
                 .setTransferCallback { from, to -> castHub.transfer(from, to) }
                 .build()
         }.onFailure { android.util.Log.d("SonoraCast", "Cast unavailable: ${it.message}") }.getOrNull()
-        val sessionPlayer: androidx.media3.common.Player = castPlayer ?: player
+        // What the system's now-playing card sees: Sonora's player, plus the Lyrics / More line when you ask for it.
+        val sessionPlayer = InfoPlayer(castPlayer ?: player)
         castHub.sessionPlayer = sessionPlayer
+        nowInfo = NowPlayingInfo(this, scope, sessionPlayer) { session.setMediaButtonPreferences(buttons(currentFavorite)) }
 
         session = MediaLibrarySession.Builder(this, sessionPlayer, LibraryCallback())
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(buttons(false))
             .build()
-        liveUpdate.start { session.player }
 
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_stat_sonora) },
@@ -302,38 +311,39 @@ class PlaybackService : MediaLibraryService() {
         getSystemService(android.net.ConnectivityManager::class.java).isActiveNetworkMetered
     }.getOrDefault(false)
 
-    // ---------------------------------------------------------------- crossfade
+    // ---------------------------------------------------------------- mixing (see SmartMix.kt)
 
-    private var crossfadeJob: Job? = null
-    private var fadingIn = false
+    private val mainMix = MixParams()
+    private lateinit var mixer: SmartMixer
 
-    /**
-     * Crossfade-style transitions: the last N seconds fade out and the next song fades in. (A true overlap needs two
-     * decoders; this keeps gapless playback and EQ intact while removing hard cuts.)
-     */
-    private fun startCrossfadeLoop() {
-        if (crossfadeJob?.isActive == true) return
-        crossfadeJob = scope.launch {
-            while (true) {
-                delay(50)
-                val fadeMs = c.settings.state.value.crossfadeSec * 1000L
-                if (fadeMs <= 0 || sleepJob?.isActive == true) {
-                    if (!fadingIn && player.volume < 1f && sleepJob?.isActive != true) player.volume = 1f
-                    continue
-                }
-                if (!player.isPlaying) continue
-                val dur = player.duration
-                val pos = player.currentPosition
-                if (fadingIn) {
-                    val v = (pos.toFloat() / (fadeMs / 2f)).coerceIn(0.05f, 1f)
-                    player.volume = v
-                    if (v >= 1f) fadingIn = false
-                } else if (dur > fadeMs * 2 && player.hasNextMediaItem() && player.repeatMode != Player.REPEAT_MODE_ONE) {
-                    val remaining = dur - pos
-                    player.volume = if (remaining < fadeMs) (remaining.toFloat() / fadeMs).coerceIn(0.05f, 1f) else 1f
-                }
-            }
+    private fun renderers(hiRes: Boolean, processors: () -> Array<androidx.media3.common.audio.AudioProcessor>) =
+        object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean,
+            ): AudioSink = DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                .setAudioProcessors(processors())
+                .build()
         }
+            // 32-bit float PCM keeps 24-bit / hi-res sources intact instead of truncating to 16-bit.
+            .setEnableAudioFloatOutput(hiRes)
+            .setEnableDecoderFallback(true)
+
+    /** The second deck: plays the end of the outgoing song while the main player starts the next one. */
+    private fun makeDeck(): Pair<ExoPlayer, MixParams> {
+        val eq = MixParams()
+        val deck = ExoPlayer.Builder(this, renderers(c.settings.state.value.hiResOutput) { arrayOf(DspProcessor(c.dsp), MixEqProcessor(eq)) })
+            .setAudioAttributes(
+                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
+                /* handleAudioFocus = */ false,
+            )
+            .setMediaSourceFactory(DefaultMediaSourceFactory(buildDataSourceFactory()))
+            .build()
+        deck.playbackParameters = player.playbackParameters
+        return deck to eq
     }
 
     private val ytStreams = java.util.concurrent.ConcurrentHashMap<String, ResolvedStream>()
@@ -381,13 +391,9 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (LiveUpdate.handle(intent, session.player)) return START_NOT_STICKY
-        return super.onStartCommand(intent, flags, startId)
-    }
-
     override fun onDestroy() {
-        liveUpdate.stop()
+        nowInfo.release()
+        mixer.release()
         finishHistory()
         saveQueue()
         c.effects.release()
@@ -488,8 +494,7 @@ class PlaybackService : MediaLibraryService() {
         historyItem = item
         historyStartedAt = System.currentTimeMillis()
         startHistoryTicker()
-        startCrossfadeLoop()
-        if (c.settings.state.value.crossfadeSec > 0 && player.isPlaying) { fadingIn = true; player.volume = 0.05f }
+        mixer.onTrackChanged()
         item?.mediaMetadata?.let { md ->
             c.scope.launch { c.scrobbler.nowPlaying(md.title?.toString().orEmpty(), md.artist?.toString().orEmpty(), md.albumTitle?.toString()) }
         }
@@ -602,6 +607,18 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun buttons(favorite: Boolean): List<CommandButton> = listOf(
+        // Lyrics: the line under the title follows the song.
+        CommandButton.Builder(if (nowInfo.mode == NowPlayingInfo.Mode.LYRICS) CommandButton.ICON_SUBTITLES_OFF else CommandButton.ICON_SUBTITLES)
+            .setDisplayName(if (nowInfo.mode == NowPlayingInfo.Mode.LYRICS) "Hide lyrics" else "Show lyrics")
+            .setSessionCommand(SessionCommand(Commands.LYRICS, Bundle.EMPTY))
+            .build(),
+        // More: up next (with its cover) → album → picks for you → back to the artist.
+        when (nowInfo.mode) {
+            NowPlayingInfo.Mode.UP_NEXT -> CommandButton.Builder(CommandButton.ICON_ALBUM).setDisplayName("Show the album")
+            NowPlayingInfo.Mode.ALBUM -> CommandButton.Builder(CommandButton.ICON_RADIO).setDisplayName("Show picks for you")
+            NowPlayingInfo.Mode.FOR_YOU -> CommandButton.Builder(CommandButton.ICON_ARTIST).setDisplayName("Back to the artist")
+            else -> CommandButton.Builder(CommandButton.ICON_QUEUE_NEXT).setDisplayName("Show up next")
+        }.setSessionCommand(SessionCommand(Commands.MORE, Bundle.EMPTY)).build(),
         CommandButton.Builder(if (favorite) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
             .setDisplayName(if (favorite) "Remove from favorites" else "Add to favorites")
             .setSessionCommand(favoriteCommand)
@@ -717,6 +734,8 @@ class PlaybackService : MediaLibraryService() {
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                 .add(sleepCommand)
                 .add(favoriteCommand)
+                .add(SessionCommand(Commands.LYRICS, Bundle.EMPTY))
+                .add(SessionCommand(Commands.MORE, Bundle.EMPTY))
                 .add(SessionCommand(Commands.SET_OUTPUT, Bundle.EMPTY))
                 .add(SessionCommand(Commands.CAST_DLNA, Bundle.EMPTY))
                 .add(SessionCommand(Commands.STOP_CAST, Bundle.EMPTY))
@@ -738,6 +757,8 @@ class PlaybackService : MediaLibraryService() {
             args: Bundle,
         ): ListenableFuture<SessionResult> {
             when (customCommand.customAction) {
+                Commands.LYRICS -> nowInfo.toggleLyrics()
+                Commands.MORE -> nowInfo.cycleMore()
                 Commands.SLEEP_TIMER -> setSleepTimer(
                     args.getInt(Commands.ARG_MINUTES, 0),
                     args.getBoolean(Commands.ARG_END_OF_TRACK, false),

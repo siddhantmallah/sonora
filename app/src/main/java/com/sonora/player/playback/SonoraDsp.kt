@@ -38,10 +38,12 @@ class DspParams {
     @Volatile var mono = false
     /** Set by the player for each track: true for lossy codecs and streams. */
     @Volatile var lossySource = true
+    /** A USB DAC is the output right now (bit-perfect only applies then). */
+    @Volatile var usbOutput = false
 
     fun apply(s: AppSettings) {
         // Bit-perfect means bit-perfect: nothing of ours touches the samples.
-        if (s.bitPerfectUsb) { enhanceMode = 0; preampDb = 0f; balance = 0f; mono = false; return }
+        if (s.bitPerfectUsb && usbOutput) { enhanceMode = 0; preampDb = 0f; balance = 0f; mono = false; return }
         enhanceMode = s.enhanceMode
         enhanceAmount = s.enhanceAmount / 100f
         preampDb = s.preampDb.toFloat()

@@ -216,6 +216,12 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         if (intent.getBooleanExtra(EXTRA_OPEN_PLAYER, false)) openPlayer.value = true
+        // From the now-playing pill or a long-press shortcut: where to go.
+        intent.getStringExtra(EXTRA_TARGET)?.let { target ->
+            if (target == "lyrics" || target == "queue") openPlayer.value = true
+            DeepLink.target.value = target
+            intent.removeExtra(EXTRA_TARGET)
+        }
         val uri: Uri? = intent.data
         // Spotify sign-in redirect (sonora://spotify-auth?code=…).
         if (uri?.scheme == "sonora" && uri.host == "spotify-auth") {
@@ -233,6 +239,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_PLAYER = "open_player"
+        const val EXTRA_TARGET = "target"
         private const val PIP_PREV = "sonora.pip.PREV"
         private const val PIP_TOGGLE = "sonora.pip.TOGGLE"
         private const val PIP_NEXT = "sonora.pip.NEXT"
@@ -252,6 +259,11 @@ object Routes {
     const val REPLAY = "replay"
     const val CONNECTIONS = "connections"
     const val DRIVE = "drive"
+}
+
+/** A place to open, from the now-playing pill or a launcher shortcut: lyrics, queue, album, foryou, search, liked, aod, shuffle. */
+object DeepLink {
+    val target = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 }
 
 /** Navigation + shared actions handed to every screen. */
@@ -364,6 +376,27 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
     }
     val actions = remember(nav, songActions) {
         UiActions(vm, nav, songActions, addToPlaylist = { playlistTarget = it }, openPlayer = { showPlayer = true })
+    }
+    val deepLink by DeepLink.target.collectAsStateWithLifecycle()
+    val appContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(deepLink, player.hasMedia) {
+        val target = deepLink ?: return@LaunchedEffect
+        when (target) {
+            // The player handles these itself once it's open.
+            "lyrics", "queue" -> if (player.hasMedia) return@LaunchedEffect
+            "album" -> {
+                showPlayer = false
+                val local = vm.song(player.songId)
+                if (local != null) actions.album(local.albumId)
+                else player.youtubeId?.let { vm.yt.song(it) }?.album?.browseId?.let { actions.yt(it) }
+            }
+            "foryou" -> { showPlayer = false; actions.tab(Routes.HOME) }
+            "search" -> { showPlayer = false; actions.tab(Routes.SEARCH) }
+            "liked" -> { showPlayer = false; actions.liked() }
+            "aod" -> com.sonora.player.ui.aod.AlwaysOnActivity.open(appContext)
+            "shuffle" -> { vm.shuffleAll(); showPlayer = true }
+        }
+        DeepLink.target.value = null
     }
 
     androidx.compose.runtime.CompositionLocalProvider(

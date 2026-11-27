@@ -177,6 +177,14 @@ fun NowPlayingScreen(
         else if (pendingPage >= 0) { val p = pendingPage; pendingPage = -1; pager.scrollToPage(p) }
     }
 
+    // Opened from the now-playing pill or a shortcut: straight to the lyrics or the queue.
+    val deepLink by com.sonora.player.ui.DeepLink.target.collectAsStateWithLifecycle()
+    LaunchedEffect(deepLink) {
+        when (deepLink) {
+            "lyrics" -> { if (landscape) stageLyrics = true else pager.scrollToPage(2); com.sonora.player.ui.DeepLink.target.value = null }
+            "queue" -> { sheet = Sheet.QUEUE; com.sonora.player.ui.DeepLink.target.value = null }
+        }
+    }
     val live = rememberLiveAudio(state.isPlaying)
     val fallback = listOf(Color(0xFF6D5BD0), Color(0xFF2B2250), Color(0xFFB2537A), Color(0xFF3A6EA5))
     val colors by rememberArtPalette(state.artUri, fallback)

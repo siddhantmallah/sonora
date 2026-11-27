@@ -9,6 +9,10 @@ import com.sonora.player.data.Song
 object Commands {
     const val SLEEP_TIMER = "sonora.SLEEP_TIMER"
     const val TOGGLE_FAVORITE = "sonora.TOGGLE_FAVORITE"
+    /** Now-playing card: lyrics under the title, on/off. */
+    const val LYRICS = "sonora.LYRICS"
+    /** Now-playing card: cycle up next / album / for you / artist. */
+    const val MORE = "sonora.MORE"
     const val SET_OUTPUT = "sonora.SET_OUTPUT"
     /** Cast the queue to a DLNA renderer (args: name, location, AVTransport and RenderingControl addresses). */
     const val CAST_DLNA = "sonora.CAST_DLNA"
