@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sound-wave "S" mark: three bars and a note head, centred in the 72dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M36,46 a3,3 0 0 1 6,0 v16 a3,3 0 0 1 -6,0z" />
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M46,36 a3,3 0 0 1 6,0 v36 a3,3 0 0 1 -6,0z" />
+    <path
+        android:fillColor="@color/launcher_accent"
+        android:pathData="M56,42 a3,3 0 0 1 6,0 v24 a3,3 0 0 1 -6,0z" />
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M66,50 a3,3 0 0 1 6,0 v8 a3,3 0 0 1 -6,0z" />
+</vector>

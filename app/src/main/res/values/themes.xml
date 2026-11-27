@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Sonora" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Every dialog window (Compose dialogs included) uses our quicker open/close animation. -->
+        <item name="android:dialogTheme">@style/Theme.Sonora.Dialog</item>
+    </style>
+
+    <!-- Same as the platform default dialog theme, only with faster window animations. -->
+    <style name="Theme.Sonora.Dialog" parent="android:Theme.Material.Light.Dialog">
+        <item name="android:windowAnimationStyle">@style/Animation.Sonora.Dialog</item>
+    </style>
+
+    <style name="Animation.Sonora.Dialog" parent="android:Animation.Dialog">
+        <item name="android:windowEnterAnimation">@anim/dialog_enter</item>
+        <item name="android:windowExitAnimation">@anim/dialog_exit</item>
+    </style>
+</resources>

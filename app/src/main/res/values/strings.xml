@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sonora</string>
+    <string name="widget_player_name">Sonora player</string>
+    <string name="widget_player_desc">Now playing with controls. Resize it for compact, wide and large layouts.</string>
+    <string name="widget_cover_name">Sonora cover</string>
+    <string name="widget_cover_desc">Album artwork with a play button.</string>
+    <string name="downloads_channel">Downloads</string>
+</resources>
