@@ -89,6 +89,7 @@ class PlaybackService : MediaLibraryService() {
     private var extras = Bundle()
     private var source: SourceFormat? = null
     private var currentFavorite = false
+    private val liveUpdate by lazy { LiveUpdate(this, scope) }
 
     private val sleepCommand = SessionCommand(Commands.SLEEP_TIMER, Bundle.EMPTY)
     private val favoriteCommand = SessionCommand(Commands.TOGGLE_FAVORITE, Bundle.EMPTY)
@@ -228,6 +229,7 @@ class PlaybackService : MediaLibraryService() {
             .setSessionActivity(openApp)
             .setMediaButtonPreferences(buttons(false))
             .build()
+        liveUpdate.start { session.player }
 
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_stat_sonora) },
@@ -379,7 +381,13 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (LiveUpdate.handle(intent, session.player)) return START_NOT_STICKY
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     override fun onDestroy() {
+        liveUpdate.stop()
         finishHistory()
         saveQueue()
         c.effects.release()

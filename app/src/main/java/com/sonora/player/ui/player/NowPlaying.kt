@@ -1462,6 +1462,7 @@ private fun androidx.compose.foundation.layout.BoxScope.MoreSheet(
     onDismiss: () -> Unit,
 ) {
     data class Action(val label: String, val icon: Int, val run: () -> Unit)
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val list = buildList {
         if (localSong != null) {
             add(Action("Add to playlist", L.drawable.lucide_ic_list_plus) { onDismiss(); actions.addToPlaylist(listOf(localSong)) })
@@ -1484,6 +1485,7 @@ private fun androidx.compose.foundation.layout.BoxScope.MoreSheet(
         if (canMatchLyrics) add(Action("Find lyrics", L.drawable.lucide_ic_search) { onOpen(Sheet.LYRICS_SEARCH) })
         add(Action("Equalizer", L.drawable.lucide_ic_sliders_horizontal) { onDismiss(); onCollapse(); actions.equalizer() })
         add(Action("Driving mode", L.drawable.lucide_ic_car) { onDismiss(); onCollapse(); actions.drive() })
+        add(Action("Always-On screen", L.drawable.lucide_ic_clock) { onDismiss(); com.sonora.player.ui.aod.AlwaysOnActivity.open(ctx) })
     }
     GlassSheet(haze, onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically) {

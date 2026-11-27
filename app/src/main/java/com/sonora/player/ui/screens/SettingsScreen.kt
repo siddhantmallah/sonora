@@ -217,6 +217,22 @@ fun SettingsScreen(vm: MainViewModel, actions: UiActions) {
             row { IosToggleRow("Skip silence", L.drawable.lucide_ic_scissors, IosColors.Gray, s.skipSilence) { set.set(Keys.skipSilence, it) } }
         }
 
+        IosGroup(
+            "Now playing", largeTitle = true,
+            footer = "Always-On: a dim clock, the song and its lyrics on black, drifting so nothing burns in. Pick Sonora as the " +
+                "screen saver and it shows by itself while your phone charges.",
+        ) {
+            if (Build.VERSION.SDK_INT >= 36) {
+                row { IosToggleRow("Live Update by the camera", L.drawable.lucide_ic_smartphone, IosColors.Green, s.liveUpdate, subtitle = "Time left in the status bar; pull down for up next, album and lyrics") { set.set(Keys.liveUpdate, it) } }
+            }
+            row { IosRow("Always-On screen", L.drawable.lucide_ic_clock, IosColors.Purple, subtitle = "Open it now") { com.sonora.player.ui.aod.AlwaysOnActivity.open(context) } }
+            row {
+                IosRow("Use as screen saver", L.drawable.lucide_ic_moon, IosColors.Blue, subtitle = "Display → Screen saver → Sonora") {
+                    runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_DREAM_SETTINGS)) }
+                }
+            }
+        }
+
         IosGroup("Audio quality", largeTitle = true) {
             row { IosToggleRow("Hi-Res output", L.drawable.lucide_ic_audio_waveform, IosColors.Orange, s.hiResOutput, subtitle = "32-bit float keeps 24-bit / 96 kHz+ intact") { set.set(Keys.hiResOutput, it) } }
             if (Build.VERSION.SDK_INT >= 34) {

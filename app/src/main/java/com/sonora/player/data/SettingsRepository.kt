@@ -70,6 +70,8 @@ data class AppSettings(
     val monoAudio: Boolean = false,
     /** App font: "system" follows the phone's font (incl. Samsung font styles); otherwise a Google Font. */
     val fontStyle: String = "system",
+    /** Android 16 Live Update: the playing song as a chip by the camera. */
+    val liveUpdate: Boolean = true,
 )
 
 /** Folders that hold voice notes and call recordings rather than music. Matched as path fragments. */
@@ -110,6 +112,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
         val balance = intPreferencesKey("balance")
         val monoAudio = booleanPreferencesKey("mono_audio")
         val fontStyle = stringPreferencesKey("font_style")
+        val liveUpdate = booleanPreferencesKey("live_update")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -146,6 +149,7 @@ class SettingsRepository(private val context: Context, scope: CoroutineScope) {
             balance = p[Keys.balance] ?: d.balance,
             monoAudio = p[Keys.monoAudio] ?: d.monoAudio,
             fontStyle = p[Keys.fontStyle] ?: d.fontStyle,
+            liveUpdate = p[Keys.liveUpdate] ?: d.liveUpdate,
         )
     }
 

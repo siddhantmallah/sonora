@@ -65,6 +65,11 @@ After that, Sonora **updates itself**: it checks this page for new releases and 
 - **Liquid tab bar**: the selected tab sits in a drop of liquid that stretches to the tab you pick, pinches off droplets, catches the light and ripples; drag along it to flick through pages
 - Clear glass dock and sheets, album-coloured player
 - Font choice: match your phone's font, or Inter, Manrope, Outfit, Nunito or a serif
+- Scroll down and the mini player melts into the tab bar as one compact glass row; scroll up for the full dock
+
+**Beyond the app**
+- **Live Update** (Android 16): the song's time left as a chip by the camera; pull it down for up next, the album, the line being sung, and previous / play / next
+- **Always-On screen**: a dim clock, the song and its lyrics on pure black, drifting so nothing burns in. Open it from the player, or pick Sonora as the screen saver to have it show while charging
 
 **Home**
 - A live sky for your time of day: real sun and moon positions, clouds and weather for where you are, golden hour and blue hour

@@ -1,5 +1,8 @@
 package com.sonora.player.ui
 
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.displayCutoutPadding
 import android.Manifest
@@ -395,13 +398,29 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
             noiseFactor(0.05f)
         }
     }
+    // Scrolling down melts the mini player into the tab bar (one compact row); scrolling up brings the full dock back.
+    val dockCollapsed = remember { mutableStateOf(false) }
+    val collapseOnScroll = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (available.y < -14f) dockCollapsed.value = true
+                else if (available.y > 14f) dockCollapsed.value = false
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    val routeNow by nav.currentBackStackEntryAsState()
+    LaunchedEffect(routeNow?.destination?.route) { dockCollapsed.value = false }
     Box(Modifier.fillMaxSize().background(bg)) {
         Scaffold(
             modifier = Modifier.graphicsLayer { alpha = if (covering.value) 0f else 1f },
             containerColor = bg,
             bottomBar = {
                 // One floating glass dock (now playing + tabs); content scrolls underneath and shows through blurred.
-                if (!immersive) Dock(nav, actions, player, vm.c.playerConnection, haze, glass, miniAlpha = { 1f - sheet.value }) { showPlayer = true }
+                if (!immersive) Dock(
+                    nav, actions, player, vm.c.playerConnection, haze, glass, miniAlpha = { 1f - sheet.value },
+                    collapsed = dockCollapsed.value && player.hasMedia, onExpand = { dockCollapsed.value = false },
+                ) { showPlayer = true }
             },
         ) { padding ->
             androidx.compose.runtime.CompositionLocalProvider(
@@ -425,7 +444,7 @@ fun SonoraAppUi(vm: MainViewModel, openPlayerState: MutableState<Boolean>) {
                                 AppNavHost(nav, actions, Modifier.fillMaxSize())
                             }
                         } else {
-                            AppNavHost(nav, actions, Modifier.fillMaxSize())
+                            AppNavHost(nav, actions, Modifier.fillMaxSize().nestedScroll(collapseOnScroll))
                         }
                     }
                 }
@@ -564,6 +583,8 @@ private fun Dock(
     haze: dev.chrisbanes.haze.HazeState,
     glass: dev.chrisbanes.haze.blur.HazeBlurStyle,
     miniAlpha: () -> Float,
+    collapsed: Boolean = false,
+    onExpand: () -> Unit = {},
     onOpen: () -> Unit,
 ) {
     val shape = RoundedCornerShape(26.dp)
@@ -586,21 +607,114 @@ private fun Dock(
         }
         return
     }
-    Column(
-        Modifier.fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
-            .shadow(12.dp, shape, ambientColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f), spotColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f))
+    androidx.compose.animation.AnimatedContent(
+        collapsed,
+        transitionSpec = {
+            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 40)) +
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(280), initialScale = 0.94f)) togetherWith
+                (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)) +
+                    androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(200), targetScale = 0.96f)) using
+                androidx.compose.animation.SizeTransform(clip = false)
+        },
+        label = "dock",
+    ) { compact ->
+        if (compact) {
+            CollapsedDock(nav, actions, state, connection, haze, glass, miniAlpha, onExpand, onOpen)
+        } else Column(
+            Modifier.fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
+                .shadow(12.dp, shape, ambientColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f), spotColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f))
+                .clip(shape)
+                .hazeBlur(dev.chrisbanes.haze.HazeInput.Sources(haze), glass)
+                .border(0.6.dp, glassRim(), shape)
+                .animateContentSize(androidx.compose.animation.core.spring(stiffness = 500f)),
+        ) {
+            if (state.hasMedia) {
+                Box(Modifier.graphicsLayer { alpha = miniAlpha() }) { NowPlayingRow(state, connection, onOpen) }
+            }
+            DockTabs(nav, actions)
+        }
+    }
+}
+
+/**
+ * The dock while you scroll down: one row of glass, the tab you're on (tap to bring the full tab bar back), the
+ * mini player in the middle, and Search (or Home) on the right.
+ */
+@Composable
+private fun CollapsedDock(
+    nav: NavHostController,
+    actions: UiActions,
+    state: PlayerState,
+    connection: PlayerConnection,
+    haze: dev.chrisbanes.haze.HazeState,
+    glass: dev.chrisbanes.haze.blur.HazeBlurStyle,
+    miniAlpha: () -> Float,
+    onExpand: () -> Unit,
+    onOpen: () -> Unit,
+) {
+    val entry by nav.currentBackStackEntryAsState()
+    val current = entry?.destination?.route
+    val here = tabs.firstOrNull { it.route == current } ?: tabs[0]
+    val other = if (here.route == Routes.SEARCH) tabs[0] else tabs.first { it.route == Routes.SEARCH }
+    Row(
+        Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 12.dp, end = 12.dp, bottom = 8.dp).height(60.dp)
+            .graphicsLayer { alpha = miniAlpha() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+    ) {
+        GlassBubble(Modifier.size(60.dp), CircleShape, haze, glass, onExpand) {
+            Box(
+                Modifier.size(46.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) { LIcon(here.icon, "${here.label}: show all tabs", tint = MaterialTheme.colorScheme.onPrimaryContainer, size = 22.dp) }
+        }
+        GlassBubble(Modifier.weight(1f).height(60.dp), RoundedCornerShape(30.dp), haze, glass, onOpen) {
+            Row(Modifier.fillMaxSize().padding(start = 9.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Artwork(state.artUri, Modifier.size(42.dp), CircleShape)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        state.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    )
+                    Text(
+                        state.artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = { connection.togglePlay() }) {
+                    LIcon(if (state.isPlaying) L.drawable.lucide_ic_pause else L.drawable.lucide_ic_play, "Play/pause", size = 22.dp)
+                }
+                IconButton(onClick = { connection.next() }) { LIcon(L.drawable.lucide_ic_skip_forward, "Next", size = 20.dp) }
+            }
+        }
+        GlassBubble(Modifier.size(60.dp), CircleShape, haze, glass, { actions.tab(other.route) }) {
+            LIcon(other.icon, other.label, size = 22.dp)
+        }
+    }
+}
+
+/** One piece of the collapsed dock: the same clear glass and rim as the full dock. */
+@Composable
+private fun GlassBubble(
+    modifier: Modifier,
+    shape: androidx.compose.ui.graphics.Shape,
+    haze: dev.chrisbanes.haze.HazeState,
+    glass: dev.chrisbanes.haze.blur.HazeBlurStyle,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier
+            .shadow(10.dp, shape, ambientColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f), spotColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f))
             .clip(shape)
             .hazeBlur(dev.chrisbanes.haze.HazeInput.Sources(haze), glass)
             .border(0.6.dp, glassRim(), shape)
-            .animateContentSize(androidx.compose.animation.core.spring(stiffness = 500f)),
-    ) {
-        if (state.hasMedia) {
-            Box(Modifier.graphicsLayer { alpha = miniAlpha() }) { NowPlayingRow(state, connection, onOpen) }
-        }
-        DockTabs(nav, actions)
-    }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { content() }
 }
 
 @Composable
